@@ -1,0 +1,13 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mlg
+      POSTGRES_PASSWORD: mlg
+      POSTGRES_DB: mlg
+    ports:
+      - "5433:5432"
+    volumes:
+      - mlgdata:/var/lib/postgresql/data
+volumes:
+  mlgdata:
