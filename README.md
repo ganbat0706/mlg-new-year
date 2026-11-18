@@ -20,6 +20,24 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Database setup
+
+Start the local Postgres container, then push the schema and provision the
+auxiliary objects (idempotent — safe to re-run on a fresh volume or CI):
+
+```bash
+cp .env.example .env.local
+docker compose up -d
+npm run db:push
+npm run db:setup
+npm run seed   # (дараагийн task-ууд асуулт/урилгын тоглоомын өгөгдлийг нэмэх үед)
+```
+
+`npm run db:setup` runs `scripts/db-setup.ts`, which creates the
+`invite_seq_counter` sequence used by the invitation-code generator
+(`CREATE SEQUENCE IF NOT EXISTS invite_seq_counter START 1;`) — it no longer
+needs to be created by hand via `docker compose exec db psql`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
