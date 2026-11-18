@@ -4,13 +4,12 @@ import {
 import { db } from '@/lib/db';
 import { attempts, attemptAnswers, questions, registrations } from '@/lib/db/schema';
 import {
-  GAME, QUIZ, REACTION, SORT, STACK, MEMO, PLAY,
+  GAME, QUIZ, SORT, STACK, MEMO, PLAY,
 } from '@/lib/config';
 import { mulberry32, pickN } from '@/lib/rng';
 import {
   scoreAnswer, buildOptionOrder, applyOptionOrder, resolveChoice,
 } from '@/lib/quiz';
-import { generateSpawnSchedule, scoreTaps, type Tap } from '@/lib/reaction';
 import {
   generateSortSchedule, scoreSort, maxSortScore, type SortItem, type SortEvent,
 } from '@/lib/games/sort';
@@ -56,7 +55,6 @@ export async function startAttempt(registrationId: string): Promise<Result<{
   stackSchedule: StackLevel[];
   memoSchedule: number[];
   answered: number;
-  reactionDone: boolean;
   sortDone: boolean;
   stackDone: boolean;
   memoDone: boolean;
@@ -96,7 +94,6 @@ export async function startAttempt(registrationId: string): Promise<Result<{
           stackSchedule: generateStackSchedule(open.seed),
           memoSchedule: generateMemoSchedule(open.seed),
           answered,
-          reactionDone: open.reactionDone,
           sortDone: open.sortDone,
           stackDone: open.stackDone,
           memoDone: open.memoDone,
@@ -132,7 +129,6 @@ export async function startAttempt(registrationId: string): Promise<Result<{
         stackSchedule: generateStackSchedule(seed),
         memoSchedule: generateMemoSchedule(seed),
         answered: 0,
-        reactionDone: false,
         sortDone: false,
         stackDone: false,
         memoDone: false,
@@ -277,28 +273,6 @@ export async function submitAnswer(
 
     return { ok: true, value: { isCorrect, points } };
   });
-}
-
-export async function submitReaction(
-  attemptId: string,
-  taps: Tap[],
-): Promise<Result<{ reactionScore: number }>> {
-  if (!Array.isArray(taps)) return fail('Tap өгөгдөл буруу байна');
-  if (taps.length > REACTION.MAX_TAPS) return fail('Хэт олон tap илгээгдлээ');
-
-  const [attempt] = await db.select().from(attempts).where(eq(attempts.id, attemptId)).limit(1);
-  if (!attempt) return fail('Оролдлого олдсонгүй');
-  if (attempt.status !== 'in_progress') return fail('Энэ оролдлого дууссан байна');
-  if (attempt.reactionDone) return fail('Reaction аль хэдийн илгээгдсэн байна');
-
-  const schedule = generateSpawnSchedule(attempt.seed);
-  const { score } = scoreTaps(schedule, taps);
-
-  await db.update(attempts)
-    .set({ reactionScore: score, reactionDone: true })
-    .where(eq(attempts.id, attemptId));
-
-  return { ok: true, value: { reactionScore: score } };
 }
 
 /** Phase 2-ын гурван шинэ тоглоом (P2-3). */
@@ -504,8 +478,6 @@ export async function finishAttempt(attemptId: string): Promise<Result<{
   sortScore: number;
   stackScore: number;
   memoScore: number;
-  /** Phase 2 — хасагдсан reaction тоглоомын оноо, нийлбэрт ОРОХГҮЙ (зөвхөн түүхэн мэдээлэл). */
-  reactionScore: number;
   bestScore: number;
   flagged: boolean;
 }>> {
@@ -533,8 +505,7 @@ export async function finishAttempt(attemptId: string): Promise<Result<{
     const answers = await tx.select({ points: attemptAnswers.points }).from(attemptAnswers)
       .where(eq(attemptAnswers.attemptId, attemptId));
     const quizScore = answers.reduce((sum, a) => sum + a.points, 0);
-    // Phase 2: totalScore = quiz + sort + stack + memo. reactionScore ороогүй —
-    // reaction тоглоом хасагдах шатандаа (P2-4-т бүрэн устгагдана).
+    // Phase 2: totalScore = quiz + sort + stack + memo (reaction тоглоом устгагдсан).
     const total = totalScore(quizScore, attempt.sortScore, attempt.stackScore, attempt.memoScore);
     const finishedAt = new Date();
 
@@ -558,7 +529,6 @@ export async function finishAttempt(attemptId: string): Promise<Result<{
         sortScore: attempt.sortScore,
         stackScore: attempt.stackScore,
         memoScore: attempt.memoScore,
-        reactionScore: attempt.reactionScore,
         bestScore,
         flagged: attempt.flagged,
       },

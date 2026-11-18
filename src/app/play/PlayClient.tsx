@@ -6,29 +6,40 @@ import { apiPost } from '@/lib/api';
 import { loadSession } from '@/lib/session';
 import { Button } from '@/components/Button';
 import { QuizStage } from './QuizStage';
-import { ReactionStage } from './ReactionStage';
-import type { SpawnItem } from '@/lib/reaction';
+import { SortStage } from './SortStage';
+import { StackStage } from './StackStage';
+import { MemoStage } from './MemoStage';
+import type { SortItem } from '@/lib/games/sort';
+import type { StackLevel } from '@/lib/games/stack';
 
 type StartData = {
   attemptId: string;
-  spawnSchedule: SpawnItem[];
+  sortSchedule: SortItem[];
+  stackSchedule: StackLevel[];
+  memoSchedule: number[];
   answered: number;
-  reactionDone: boolean;
+  sortDone: boolean;
+  stackDone: boolean;
+  memoDone: boolean;
 };
 
-type FinishData = {
-  totalScore: number;
-  quizScore: number;
-  reactionScore: number;
-  bestScore: number;
-};
+type Progress = { sort: boolean; stack: boolean; memo: boolean };
 
-type Stage = 'loading' | 'quiz' | 'reaction' | 'error';
+type Stage = 'loading' | 'quiz' | 'sort' | 'stack' | 'memo' | 'finishing' | 'error';
+
+/** Эхлэх дэс дараа нь: Асуулт → Зөв зам → Контейнер овоолох → Хос манифест → finish. */
+function firstUnfinished(p: Progress): Stage {
+  if (!p.sort) return 'sort';
+  if (!p.stack) return 'stack';
+  if (!p.memo) return 'memo';
+  return 'finishing';
+}
 
 export function PlayClient() {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>('loading');
   const [start, setStart] = useState<StartData | null>(null);
+  const [progress, setProgress] = useState<Progress>({ sort: false, stack: false, memo: false });
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -42,28 +53,36 @@ export function PlayClient() {
       if (!res.ok) { setError(res.error); setStage('error'); return; }
 
       setStart(res.data);
-
-      if (res.data.reactionDone) {
-        // reactionDone === true зөвхөн энэ оролдлогын reaction tap-ууд аль хэдийн
-        // илгээгдсэн ч finish дуудагдаагүй гэсэн үг. ReactionStage рүү дахин оруулбал
-        // тоглогч тоглоомоо дахин тоглох ёстой болох ба submitReaction хоёр дахь
-        // илгээлтийг татгалзана («Reaction аль хэдийн илгээгдсэн байна») — тэнцвэргүй
-        // мухардалд хүргэнэ. Иймд reaction үе шатыг алгасаж, шууд дуусгаад /result
-        // руу шилжинэ.
-        const finishRes = await apiPost<FinishData>(
-          `/api/attempt/${res.data.attemptId}/finish`,
-          {},
-        );
-        if (!finishRes.ok) { setError(finishRes.error); setStage('error'); return; }
-        router.push('/result');
-        return;
-      }
-
+      setProgress({
+        sort: res.data.sortDone,
+        stack: res.data.stackDone,
+        memo: res.data.memoDone,
+      });
+      // Асуулт үе шатыг үргэлж эхэлнэ — хэрэв бүгдийг нь хариулсан бол
+      // QuizStage серверээс null асуулт хүлээж аваад шууд onDone дуудна.
       setStage('quiz');
     })();
   }, [router]);
 
-  if (stage === 'loading') {
+  async function finishAndGo() {
+    if (!start) return;
+    setStage('finishing');
+    const res = await apiPost<unknown>(`/api/attempt/${start.attemptId}/finish`, {});
+    if (!res.ok) { setError(res.error); setStage('error'); return; }
+    router.push('/result');
+  }
+
+  /** Тухайн тоглоомыг дуусгаад (resume-ийн эхний төлвөөс тооцож) дараагийн
+   * дуусаагүй шат руу шилжинэ, бүгд дуусвал finish дуудна. */
+  function afterGame(game: keyof Progress) {
+    const next = { ...progress, [game]: true };
+    setProgress(next);
+    const ns = firstUnfinished(next);
+    if (ns === 'finishing') void finishAndGo();
+    else setStage(ns);
+  }
+
+  if (stage === 'loading' || stage === 'finishing') {
     return <p className="py-24 text-center text-[#6B6568]">Бэлтгэж байна…</p>;
   }
 
@@ -86,21 +105,43 @@ export function PlayClient() {
     return (
       <QuizStage
         attemptId={start.attemptId}
-        onDone={() => setStage('reaction')}
+        onDone={() => {
+          const ns = firstUnfinished(progress);
+          if (ns === 'finishing') void finishAndGo();
+          else setStage(ns);
+        }}
+        onError={(m) => { setError(m); setStage('error'); }}
+      />
+    );
+  }
+
+  if (stage === 'sort') {
+    return (
+      <SortStage
+        attemptId={start.attemptId}
+        schedule={start.sortSchedule}
+        onDone={() => afterGame('sort')}
+        onError={(m) => { setError(m); setStage('error'); }}
+      />
+    );
+  }
+
+  if (stage === 'stack') {
+    return (
+      <StackStage
+        attemptId={start.attemptId}
+        schedule={start.stackSchedule}
+        onDone={() => afterGame('stack')}
         onError={(m) => { setError(m); setStage('error'); }}
       />
     );
   }
 
   return (
-    <ReactionStage
+    <MemoStage
       attemptId={start.attemptId}
-      schedule={start.spawnSchedule}
-      onDone={async () => {
-        const res = await apiPost<unknown>(`/api/attempt/${start.attemptId}/finish`, {});
-        if (!res.ok) { setError(res.error); setStage('error'); return; }
-        router.push('/result');
-      }}
+      schedule={start.memoSchedule}
+      onDone={() => afterGame('memo')}
       onError={(m) => { setError(m); setStage('error'); }}
     />
   );

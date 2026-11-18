@@ -57,8 +57,7 @@ function parseMemoEvents(raw: unknown[]): MemoEvent[] {
  *  - `{ begin: true }` — тухайн тоглоомын серверийн эхлэх цагийг тэмдэглэнэ.
  *  - `{ events: [...] }` — үйлдлийн жагсаалтыг дахин тоглож оноо тооцно.
  *
- * `PLAY.MAX_EVENTS`-ийг санд хандахаас ӨМНӨ энд шалгана (submitReaction-ий
- * REACTION.MAX_TAPS шалгалттай адил зарчим).
+ * `PLAY.MAX_EVENTS`-ийг санд хандахаас ӨМНӨ энд шалгана.
  */
 export async function POST(
   req: Request,

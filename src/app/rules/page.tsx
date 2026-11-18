@@ -1,14 +1,14 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { isGameOpen, QUIZ, REACTION, GAME } from '@/lib/config';
+import {
+  isGameOpen, QUIZ, SORT, STACK, MEMO, GAME,
+} from '@/lib/config';
 import { Brand } from '@/components/Brand';
 
 export const dynamic = 'force-dynamic';
 
 export default function RulesPage() {
   if (!isGameOpen()) redirect('/result');
-
-  const seconds = REACTION.DURATION_MS / 1000;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col px-5 py-10">
@@ -24,14 +24,26 @@ export default function RulesPage() {
           </p>
         </li>
         <li>
-          <h2 className="text-lg font-bold">2. Ачаа ачих — {seconds} секунд</h2>
+          <h2 className="text-lg font-bold">2. Зөв зам — {SORT.DURATION_MS / 1000} секунд</h2>
           <p className="mt-1.5 text-base leading-relaxed text-[#6B6568]">
-            Улаан контейнер дээр дарж ачна (+{REACTION.GOOD_POINTS}).
-            Хар «эвдэрсэн ачаа» дээр дарвал оноо хасагдана ({REACTION.BAD_POINTS}).
+            Ачааг зөв тээврийн хэрэгсэл рүү (төмөр зам, авто, агаар) чиглүүлнэ,
+            эвдэрсэн ачааг буцаана.
           </p>
         </li>
         <li>
-          <h2 className="text-lg font-bold">3. Оролдлого — {GAME.MAX_ATTEMPTS} удаа</h2>
+          <h2 className="text-lg font-bold">3. Контейнер овоолох — {STACK.DURATION_MS / 1000} секунд</h2>
+          <p className="mt-1.5 text-base leading-relaxed text-[#6B6568]">
+            Савалж буй контейнерийг өмнөх овоолгын төвд тааруулан буулгана.
+          </p>
+        </li>
+        <li>
+          <h2 className="text-lg font-bold">4. Хос манифест — {MEMO.DURATION_MS / 1000} секунд</h2>
+          <p className="mt-1.5 text-base leading-relaxed text-[#6B6568]">
+            Нуугдсан хос контейнерийг санаж олно. Хурдан дуусгах тусам урамшуулал.
+          </p>
+        </li>
+        <li>
+          <h2 className="text-lg font-bold">5. Оролдлого — {GAME.MAX_ATTEMPTS} удаа</h2>
           <p className="mt-1.5 text-base leading-relaxed text-[#6B6568]">
             Хамгийн сайн оноо тооцогдоно. Эхний {GAME.PRIZE_PLACES} байр шагналтай.
           </p>

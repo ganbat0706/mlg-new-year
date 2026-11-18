@@ -31,9 +31,6 @@ export const attempts = pgTable('attempts', {
   seed: integer('seed').notNull(),
   questionIds: jsonb('question_ids').$type<number[]>().notNull(),
   quizScore: integer('quiz_score').notNull().default(0),
-  // Phase 2-т хасагдах reaction тоглоом — зарим файл хараахан шилжээгүй (P2-3-т хасна).
-  reactionScore: integer('reaction_score').notNull().default(0),
-  reactionDone: boolean('reaction_done').notNull().default(false),
   // Phase 2 — гурван шинэ тоглоом (P2-1).
   sortScore: integer('sort_score').notNull().default(0),
   stackScore: integer('stack_score').notNull().default(0),
