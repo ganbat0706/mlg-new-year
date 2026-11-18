@@ -5,17 +5,24 @@ const DIR = 'src/assets/fonts';
 
 // Анхны төлөвлөгөө google/fonts repo-гийн "ofl/notosans/static/*.ttf" замаас
 // татах байсан ч тэр repo variable font (NotoSans[wdth,wght].ttf) руу шилжсэн тул
-// static замууд 404 өгдөг болсон (шалгасан: 2026-11-18). Satori нь woff2-г
-// уншихгүй тул заавал .ttf хэрэгтэй хэвээр байгаа тул оронд нь fontsource-ийн
-// jsDelivr CDN-ээс subset тус бүрээр (latin, cyrillic) static TTF татна — эдгээр
-// нь жинхэнэ Noto Sans-аас хөрвүүлсэн, кирилл болон латин үсгийг бүрэн дэмждэг
-// (Монгол кирилл-ийн нэмэлт үсэг Ө/ү-г оролцуулан баталгаажуулсан).
-const DIST = 'https://cdn.jsdelivr.net/fontsource/fonts/noto-sans@latest';
+// static замууд 404 өгдөг болсон (шалгасан: 2026-11-18).
+//
+// Дараа нь fontsource-ийн jsDelivr CDN-ээс subset тус бүрээр (latin, cyrillic)
+// татаж, Satori-ийн ижил нэртэй fallback stack-ээр нэгтгэсэн ч код-review дээр
+// илэрсэн: Satori-ийн subset-fallback нь жин (weight)-г тэмдэгт бүрээр зөв
+// шийдвэрлэдэггүй болох нь тогтоогдсон — кирилл текст үргэлж Regular жингээр
+// зурагдаж, Bold нь зөвхөн латин тэмдэгтэд ажилладаг байв (пиксел хэмжилтээр
+// нотлогдсон, task-15-report.md-ийн "Fix round 1"-ийг үзнэ үү).
+//
+// Тиймээс нэг файл = нэг жин, латин+кирилл ХОЁУЛАНГ нь нэг TTF дотор агуулсан
+// фонт руу шилжив: DejaVu Sans (chromium/LibreOffice-ийн адил өргөн тархсан,
+// нээлттэй эх кодтой, Cyrillic Extended-A-г (Ө/Ү) оролцуулсан бүрэн Unicode
+// хамрах хүрээтэй). Файлууд том болсон (нийт ~1.4 MB) ч жингийн шийдвэрлэлтийг
+// subset-fallback-гүйгээр баталгаатай болгосон тул энэ нь зөв сэлгэц.
+const DIST = 'https://cdn.jsdelivr.net/npm/dejavu-fonts-ttf@2.37.3/ttf';
 const FILES = [
-  ['NotoSans-Latin-Regular.ttf', `${DIST}/latin-400-normal.ttf`],
-  ['NotoSans-Cyrillic-Regular.ttf', `${DIST}/cyrillic-400-normal.ttf`],
-  ['NotoSans-Latin-Bold.ttf', `${DIST}/latin-700-normal.ttf`],
-  ['NotoSans-Cyrillic-Bold.ttf', `${DIST}/cyrillic-700-normal.ttf`],
+  ['DejaVuSans-Regular.ttf', `${DIST}/DejaVuSans.ttf`],
+  ['DejaVuSans-Bold.ttf', `${DIST}/DejaVuSans-Bold.ttf`],
 ];
 
 await mkdir(DIR, { recursive: true });

@@ -18,28 +18,36 @@ const RED = '#ED1C24';
 const INK = '#221E20';
 const PAPER = '#FAF7F0';
 const MUTED = '#6B6568';
+/**
+ * Footer дотор БАЙРШИЛ баганад тогтмол px өргөн заавал өгөх ёстой: Satori/Yoga
+ * flexGrow+minWidth:0 хослол энд текстийг зөв биелдэггүй болох нь бодит
+ * зураг үзээд илэрсэн (текст card-аас, бүр 1080px canvas-аас ч гадагшилж
+ * байсан). Тогтмол width өгснөөр текст үргэлж энэ хайрцгийн дотор wrap хийнэ,
+ * ДУГААР багана бол доор өөрийн тусдаа мөрөнд байгаа тул энэ өргөн хэзээ ч
+ * ДУГААР-ыг шахахгүй.
+ */
+const VENUE_WIDTH = 420;
 
 /**
- * google/fonts-ийн "ofl/notosans/static/*.ttf" зам variable font руу шилжсэний
- * улмаас 404 болсон (шалгасан: 2026-11-18, scripts/fetch-fonts.mjs-ийн
- * тайлбарыг үзнэ үү). Үүний оронд fontsource-ийн хөрвүүлсэн static TTF-ийг
- * subset тус бүрээр (latin, cyrillic) ашигласан тул фонтын жагсаалтад жин бүрт
- * хоёр файл (latin + cyrillic) орно — Satori эдгээрийг ижил нэртэй fallback
- * stack гэж үзэж, тэмдэгт тус бүрт эзэмшдэг файлаасаа зурна.
+ * Анх Noto Sans-ийг subset (latin/cyrillic) тус бүрээр дөрвөн файлаар fallback
+ * stack болгон өгч байсан ч код-ревьюгээр илэрсэн: Satori-ийн subset-fallback
+ * нь жин (weight)-ийг тэмдэгт бүрээр зөв шийдвэрлэдэггүй — кирилл текст үргэлж
+ * Regular зурагдаж, Bold зөвхөн латин тэмдэгтэд нөлөөлдөг байв (пиксел
+ * хэмжилтээр нотлогдсон, task-15-report.md-ийн "Fix round 1"-ийг үзнэ үү).
+ *
+ * Тиймээс DejaVu Sans руу шилжив: нэг TTF файл латин ба кирилл хоёуланг нь
+ * агуулдаг тул жин бүрт ганц файл хангалттай — subset-fallback огт хэрэггүй
+ * болж, жингийн шийдвэрлэлт найдвартай болсон.
  */
 async function loadFonts() {
   const dir = path.join(process.cwd(), 'src/assets/fonts');
-  const [latinRegular, cyrillicRegular, latinBold, cyrillicBold] = await Promise.all([
-    readFile(path.join(dir, 'NotoSans-Latin-Regular.ttf')),
-    readFile(path.join(dir, 'NotoSans-Cyrillic-Regular.ttf')),
-    readFile(path.join(dir, 'NotoSans-Latin-Bold.ttf')),
-    readFile(path.join(dir, 'NotoSans-Cyrillic-Bold.ttf')),
+  const [regular, bold] = await Promise.all([
+    readFile(path.join(dir, 'DejaVuSans-Regular.ttf')),
+    readFile(path.join(dir, 'DejaVuSans-Bold.ttf')),
   ]);
   return [
-    { name: 'Noto', data: latinRegular, weight: 400 as const, style: 'normal' as const },
-    { name: 'Noto', data: cyrillicRegular, weight: 400 as const, style: 'normal' as const },
-    { name: 'Noto', data: latinBold, weight: 700 as const, style: 'normal' as const },
-    { name: 'Noto', data: cyrillicBold, weight: 700 as const, style: 'normal' as const },
+    { name: 'DejaVuSans', data: regular, weight: 400 as const, style: 'normal' as const },
+    { name: 'DejaVuSans', data: bold, weight: 700 as const, style: 'normal' as const },
   ];
 }
 
@@ -58,6 +66,21 @@ function nameFontSize(fullName: string): number {
   return 34;
 }
 
+/**
+ * Байршлын талбар бол event.venue гэдэг нь арга хэмжээний баг гараар бөглөх
+ * чөлөөт текст — урт нь урьдчилан мэдэгдэхгүй. Урт нь нэмэгдэх тусам фонтыг
+ * багасгаж, доод талд 2 мөрөөр хязгаарлан хэтэрсэн хэсгийг тасална
+ * (venueMaxHeight-той хамт). Босго утгуудыг бодит зураг үүсгэж харж тохируулсан
+ * (task-15-report.md-ийн "Fix round 1" хэсгийг үзнэ үү) — таамаглаагүй.
+ */
+function venueFontSize(venue: string): number {
+  const len = venue.length;
+  if (len <= 20) return 32;
+  if (len <= 40) return 26;
+  if (len <= 70) return 22;
+  return 18;
+}
+
 export async function GET(
   req: Request,
   ctx: { params: Promise<{ code: string }> },
@@ -73,6 +96,10 @@ export async function GET(
   const [fonts, logo] = await Promise.all([loadFonts(), loadLogo(origin)]);
 
   const fullName = `${reg.lastName} ${reg.firstName}`;
+  const venueText = event.venue || '—';
+  const venueSize = venueFontSize(venueText);
+  const venueLineHeight = 1.25;
+  const venueMaxHeight = Math.round(venueSize * venueLineHeight * 2); // 2 мөрөөс хэтрэхгүй
 
   const label = (text: string) => (
     <div style={{ fontSize: 20, letterSpacing: 3, color: MUTED }}>{text}</div>
@@ -82,7 +109,7 @@ export async function GET(
     (
       <div style={{
         width: W, height: H, display: 'flex', flexDirection: 'column',
-        background: PAPER, color: INK, fontFamily: 'Noto',
+        background: PAPER, color: INK, fontFamily: 'DejaVuSans',
       }}>
         <div style={{ display: 'flex', height: 16 }}>
           <div style={{ flexGrow: 3, background: RED }} />
@@ -127,25 +154,46 @@ export async function GET(
 
         <div style={{ flexGrow: 1 }} />
 
+        {/*
+          ДУГААР (урилгын код) бол зочны хаалган дээр хэрэгтэй цорын ганц
+          талбар тул БАЙРШИЛ (чөлөөт, урт нь мэдэгдэхгүй текст)-тай адил мөрөнд
+          зэрэгцүүлэхгүй — өөрийн тусдаа мөрөнд, ямар ч тохиолдолд бусад
+          талбараас шахагдахгүйгээр байрлуулав (Критик алдаа: урт хаяг
+          ДУГААР-ыг 1080px canvas-аас гадагшлуулж байсныг засав).
+        */}
         <div style={{
-          display: 'flex', margin: '0 80px', borderRadius: 8, background: INK,
-          color: PAPER, padding: '38px 44px', alignItems: 'center',
+          display: 'flex', flexDirection: 'column', margin: '0 80px',
+          borderRadius: 8, background: INK, color: PAPER,
         }}>
-          <div style={{ display: 'flex', flexDirection: 'column', marginRight: 56 }}>
-            <div style={{ fontSize: 18, letterSpacing: 3, color: '#B5AFB1' }}>ОГНОО</div>
-            <div style={{ fontSize: 32, fontWeight: 700 }}>{event.date}</div>
+          <div style={{ display: 'flex', padding: '34px 44px 0', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', marginRight: 56 }}>
+              <div style={{ fontSize: 18, letterSpacing: 3, color: '#B5AFB1' }}>ОГНОО</div>
+              <div style={{ fontSize: 32, fontWeight: 700 }}>{event.date}</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', marginRight: 56 }}>
+              <div style={{ fontSize: 18, letterSpacing: 3, color: '#B5AFB1' }}>ЦАГ</div>
+              <div style={{ fontSize: 32, fontWeight: 700 }}>{event.time || '—'}</div>
+            </div>
+            <div style={{
+              display: 'flex', flexDirection: 'column', width: VENUE_WIDTH,
+            }}>
+              <div style={{ fontSize: 18, letterSpacing: 3, color: '#B5AFB1' }}>БАЙРШИЛ</div>
+              <div style={{
+                width: VENUE_WIDTH, marginTop: 4, fontSize: venueSize, fontWeight: 700,
+                lineHeight: venueLineHeight, maxHeight: venueMaxHeight, overflow: 'hidden',
+              }}>
+                {venueText}
+              </div>
+            </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', marginRight: 56 }}>
-            <div style={{ fontSize: 18, letterSpacing: 3, color: '#B5AFB1' }}>ЦАГ</div>
-            <div style={{ fontSize: 32, fontWeight: 700 }}>{event.time || '—'}</div>
+
+          <div style={{ display: 'flex', margin: '28px 44px 0' }}>
+            <div style={{ width: '100%', height: 1, background: 'rgba(250,247,240,0.2)' }} />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, marginRight: 32 }}>
-            <div style={{ fontSize: 18, letterSpacing: 3, color: '#B5AFB1' }}>БАЙРШИЛ</div>
-            <div style={{ fontSize: 32, fontWeight: 700 }}>{event.venue || '—'}</div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+
+          <div style={{ display: 'flex', flexDirection: 'column', padding: '22px 44px 34px' }}>
             <div style={{ fontSize: 18, letterSpacing: 3, color: '#B5AFB1' }}>ДУГААР</div>
-            <div style={{ fontSize: 36, fontWeight: 700 }}>{reg.inviteCode}</div>
+            <div style={{ marginTop: 4, fontSize: 44, fontWeight: 700 }}>{reg.inviteCode}</div>
           </div>
         </div>
 
