@@ -10,14 +10,14 @@ export default function ResultPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-5 py-10">
-      <Brand />
+      <div className="enter"><Brand /></div>
 
-      <h1 className="mt-10 text-3xl font-extrabold tracking-tight">
+      <h1 className="enter mt-10 text-3xl font-extrabold tracking-tight">
         {open ? 'Үр дүн' : 'Тоглоом дууслаа'}
       </h1>
 
       {!open && (
-        <p className="mt-3 rounded-lg bg-[#221E20] px-5 py-4 text-base text-[#FAF7F0]">
+        <p className="enter mt-3 rounded-lg bg-[#221E20] px-5 py-4 text-base text-[#FAF7F0]">
           Тэмцээн хаагдлаа. Арга хэмжээ <strong>{event.date}</strong>
           {event.time ? ` · ${event.time}` : ''}
           {event.venue ? ` · ${event.venue}` : ''} болно.
@@ -25,7 +25,7 @@ export default function ResultPage() {
         </p>
       )}
 
-      <div className="mt-8">
+      <div className="enter mt-8">
         <ResultClient gameOpen={open} />
       </div>
     </main>

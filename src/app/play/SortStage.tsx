@@ -5,6 +5,7 @@ import { apiPost } from '@/lib/api';
 import { SORT } from '@/lib/config';
 import { maxSortScore, type SortEvent, type SortItem, type SortLane, type SortMode } from '@/lib/games/sort';
 import { Button } from '@/components/Button';
+import { Loader } from '@/components/Loader';
 
 type Props = {
   attemptId: string;
@@ -164,7 +165,7 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'ready') {
     return (
-      <div className="py-10 text-center">
+      <div className="enter py-10 text-center">
         <h2 className="text-3xl font-extrabold tracking-tight">Зөв зам</h2>
         <p className="mx-auto mt-4 max-w-sm text-base leading-relaxed text-[#6B6568]">
           Ачааг зөв тээврийн хэрэгсэл рүү (<strong>төмөр зам · авто · агаар</strong>) чиглүүл,{' '}
@@ -177,7 +178,7 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'begin-error') {
     return (
-      <div className="py-10 text-center">
+      <div className="enter py-10 text-center">
         <p role="alert" className="rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
           Тоглоом эхлүүлж чадсангүй. Сүлжээгээ шалгаад дахин оролдоно уу.
         </p>
@@ -187,12 +188,12 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
   }
 
   if (phase === 'submitting') {
-    return <p className="py-24 text-center text-[#6B6568]">Оноог тооцож байна…</p>;
+    return <Loader label="Оноог тооцож байна…" />;
   }
 
   if (phase === 'submit-error') {
     return (
-      <div className="py-10 text-center">
+      <div className="enter py-10 text-center">
         <p role="alert" className="rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
           Илгээж чадсангүй. Таны тоглолт хадгалагдсан байгаа — дахин оролдоно уу.
         </p>
@@ -203,7 +204,7 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'result') {
     return (
-      <p data-testid="stage-result" className="py-24 text-center text-xl font-bold">
+      <p data-testid="stage-result" className="enter py-24 text-center text-xl font-bold">
         Дүн: {resultScore} / {maxSortScore(schedule)}
       </p>
     );
@@ -226,7 +227,7 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
         style={{ height: 'min(48dvh, 340px)' }}
       >
         {current && (
-          <div className="flex flex-col items-center gap-3">
+          <div key={current.id} className="obj-mount flex flex-col items-center gap-3">
             {current.damaged ? <DamagedIcon /> : <ModeIcon mode={current.mode} />}
             <p data-testid="sort-label" className="text-lg font-bold text-[#FAF7F0]">
               {current.damaged ? 'Эвдэрсэн' : MODE_LABEL[current.mode]}
@@ -242,8 +243,8 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
             type="button"
             data-testid={`lane-${lane}`}
             onPointerDown={() => tap(lane, Date.now() - startedAtRef.current)}
-            className="min-h-14 touch-none rounded-lg bg-[#C21019] px-1 text-sm font-semibold
-                       leading-tight text-white transition hover:bg-[#9E0D14]"
+            className="press min-h-14 touch-none rounded-lg bg-[#C21019] px-1 text-sm font-semibold
+                       leading-tight text-white hover:bg-[#9E0D14]"
           >
             {label}
           </button>

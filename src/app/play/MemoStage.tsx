@@ -5,6 +5,7 @@ import { apiPost } from '@/lib/api';
 import { MEMO, PLAY } from '@/lib/config';
 import { maxMemoScore, type MemoEvent } from '@/lib/games/memo';
 import { Button } from '@/components/Button';
+import { Loader } from '@/components/Loader';
 
 type Props = {
   attemptId: string;
@@ -168,7 +169,7 @@ export function MemoStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'ready') {
     return (
-      <div className="py-10 text-center">
+      <div className="enter py-10 text-center">
         <h2 className="text-3xl font-extrabold tracking-tight">Хос манифест</h2>
         <p className="mx-auto mt-4 max-w-sm text-base leading-relaxed text-[#6B6568]">
           Нуугдсан <strong>хос контейнерийг</strong> дарж олоорой — эрт дуусгах тусам урамшуулал.
@@ -180,7 +181,7 @@ export function MemoStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'begin-error') {
     return (
-      <div className="py-10 text-center">
+      <div className="enter py-10 text-center">
         <p role="alert" className="rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
           Тоглоом эхлүүлж чадсангүй. Сүлжээгээ шалгаад дахин оролдоно уу.
         </p>
@@ -190,12 +191,12 @@ export function MemoStage({ attemptId, schedule, onDone }: Props) {
   }
 
   if (phase === 'submitting') {
-    return <p className="py-24 text-center text-[#6B6568]">Оноог тооцож байна…</p>;
+    return <Loader label="Оноог тооцож байна…" />;
   }
 
   if (phase === 'submit-error') {
     return (
-      <div className="py-10 text-center">
+      <div className="enter py-10 text-center">
         <p role="alert" className="rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
           Илгээж чадсангүй. Таны тоглолт хадгалагдсан байгаа — дахин оролдоно уу.
         </p>
@@ -206,7 +207,7 @@ export function MemoStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'result') {
     return (
-      <p data-testid="stage-result" className="py-24 text-center text-xl font-bold">
+      <p data-testid="stage-result" className="enter py-24 text-center text-xl font-bold">
         Дүн: {resultScore} / {maxMemoScore(schedule)}
       </p>
     );
@@ -240,10 +241,10 @@ export function MemoStage({ attemptId, schedule, onDone }: Props) {
               }`}
             >
               {isOpen ? (
-                <>
+                <span key={card} className="obj-mount flex flex-col items-center gap-1">
                   <CargoIcon />
                   <span>{WORDS[pairId]}</span>
-                </>
+                </span>
               ) : null}
             </button>
           );

@@ -137,6 +137,28 @@ export async function startAttempt(registrationId: string): Promise<Result<{
   });
 }
 
+/**
+ * Сэжигтэй (flagged) оролдлоготой бүртгэлүүдийг, учир шалтгааны хамт буцаана.
+ * Нэг бүртгэлд хэд хэдэн flagged оролдлого байж болох тул шалтгаануудыг
+ * нэгтгэнэ (давхцсан мөрийг алгасна) — админ хуудас болон CSV экспортод
+ * ашиглана (анти-чит хэлхээний сүүлчийн холбоос, п.5).
+ */
+export async function listFlaggedReasons(): Promise<Map<string, string[]>> {
+  const rows = await db.select({
+    registrationId: attempts.registrationId,
+    flagReason: attempts.flagReason,
+  }).from(attempts).where(eq(attempts.flagged, true));
+
+  const byReg = new Map<string, string[]>();
+  for (const r of rows) {
+    const reason = r.flagReason ?? 'Тодорхойгүй шалтгаан';
+    const existing = byReg.get(r.registrationId) ?? [];
+    if (!existing.includes(reason)) existing.push(reason);
+    byReg.set(r.registrationId, existing);
+  }
+  return byReg;
+}
+
 async function countAnswered(tx: Tx, attemptId: string): Promise<number> {
   const rows = await tx.select({ id: attemptAnswers.id }).from(attemptAnswers)
     .where(and(eq(attemptAnswers.attemptId, attemptId), sql`${attemptAnswers.answeredAt} IS NOT NULL`));
@@ -480,6 +502,10 @@ export async function finishAttempt(attemptId: string): Promise<Result<{
   memoScore: number;
   bestScore: number;
   flagged: boolean;
+  /** Оноо буух мөчийг (score-reveal) "Шинэ дээд амжилт" эсэхийг шийдэхэд
+   * ашиглана — энэ бол хэдэн дэх оролдлого вэ (эхний оролдлого шинэ дээд
+   * амжилт болох нь мэдээж тул тоолохгүй). */
+  attemptsUsed: number;
 }>> {
   // registrationId-г мэдэхийн тулд attempts-ээс урьдчилж уншина — энэ нь түгжээгүй,
   // transaction-оос гадуурх энгийн SELECT тул дарааллын баталгаанд нөлөөлөхгүй.
@@ -531,6 +557,7 @@ export async function finishAttempt(attemptId: string): Promise<Result<{
         memoScore: attempt.memoScore,
         bestScore,
         flagged: attempt.flagged,
+        attemptsUsed: reg.attemptsUsed,
       },
     };
   });

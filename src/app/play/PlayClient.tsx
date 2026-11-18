@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiPost } from '@/lib/api';
 import { loadSession } from '@/lib/session';
+import { saveLastFinish, type FinishPayload } from '@/lib/finish';
 import { Button } from '@/components/Button';
+import { Loader } from '@/components/Loader';
 import { QuizStage } from './QuizStage';
 import { SortStage } from './SortStage';
 import { StackStage } from './StackStage';
@@ -67,8 +69,9 @@ export function PlayClient() {
   async function finishAndGo() {
     if (!start) return;
     setStage('finishing');
-    const res = await apiPost<unknown>(`/api/attempt/${start.attemptId}/finish`, {});
+    const res = await apiPost<FinishPayload>(`/api/attempt/${start.attemptId}/finish`, {});
     if (!res.ok) { setError(res.error); setStage('error'); return; }
+    saveLastFinish(res.data);
     router.push('/result');
   }
 
@@ -83,13 +86,13 @@ export function PlayClient() {
   }
 
   if (stage === 'loading' || stage === 'finishing') {
-    return <p className="py-24 text-center text-[#6B6568]">Бэлтгэж байна…</p>;
+    return <Loader label="Бэлтгэж байна…" />;
   }
 
   if (stage === 'error') {
     return (
       <div className="py-16">
-        <p role="alert" className="rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
+        <p role="alert" className="enter-sm rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
           {error}
         </p>
         <Button className="mt-6 w-full" onClick={() => router.push('/result')}>

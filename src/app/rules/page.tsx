@@ -12,10 +12,10 @@ export default function RulesPage() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col px-5 py-10">
-      <Brand />
-      <h1 className="mt-10 text-3xl font-extrabold tracking-tight">Дүрэм</h1>
+      <div className="enter"><Brand /></div>
+      <h1 className="enter mt-10 text-3xl font-extrabold tracking-tight">Дүрэм</h1>
 
-      <ol className="mt-8 space-y-6">
+      <ol className="enter mt-8 space-y-6">
         <li>
           <h2 className="text-lg font-bold">1. Асуулт — {QUIZ.QUESTION_COUNT} ширхэг</h2>
           <p className="mt-1.5 text-base leading-relaxed text-[#6B6568]">
@@ -54,7 +54,7 @@ export default function RulesPage() {
 
       <Link
         href="/play"
-        className="mt-10 inline-flex min-h-14 w-full items-center justify-center rounded-lg
+        className="enter press mt-10 inline-flex min-h-14 w-full items-center justify-center rounded-lg
                    bg-[#C21019] px-8 text-lg font-semibold text-white hover:bg-[#9E0D14]"
       >
         Эхлэх

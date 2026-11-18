@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isGameOpen, eventInfo } from '@/lib/config';
 import { Brand } from '@/components/Brand';
+import { WinterScene } from '@/components/WinterScene';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,29 +14,36 @@ export default function Home() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col px-5 py-10">
-      <Brand />
+      <div className="enter"><Brand /></div>
+
+      <div
+        className="relative mt-6 rounded-2xl"
+        style={{ backgroundImage: 'radial-gradient(60% 40% at 100% 0%, #FDECEC, transparent)' }}
+      >
+        <WinterScene />
+      </div>
 
       <div className="flex flex-1 flex-col justify-center py-10">
-        <p className="text-sm font-semibold tracking-[0.2em] text-[#C21019]">
+        <p className="enter enter-delay-1 text-sm font-semibold tracking-[0.2em] text-[#C21019]">
           ШИНЭ ЖИЛИЙН БАЯР
         </p>
-        <h1 className="mt-3 text-5xl font-extrabold leading-none tracking-tight sm:text-6xl">
-          2026
+        <h1 className="enter enter-delay-2 mt-3 text-5xl font-extrabold leading-none tracking-tight sm:text-6xl">
+          <span className="text-[#221E20]">20</span><span className="text-[#ED1C24]">26</span>
         </h1>
-        <p className="mt-6 text-lg leading-relaxed text-[#221E20]">
+        <p className="enter enter-delay-3 mt-6 text-lg leading-relaxed text-[#221E20]">
           Богино тоглоом тоглоод урилгаа аваарай. Хамгийн өндөр оноо авсан
           эхний 5 ажилтан арга хэмжээн дээр шагнал хүртэнэ.
         </p>
 
-        <ul className="mt-8 space-y-2 text-base text-[#6B6568]">
+        <ul className="enter enter-delay-3 mt-8 space-y-2 text-base text-[#6B6568]">
           <li>· 10 асуулт — асуулт тус бүр 10 секунд</li>
-          <li>· 20 секундын «Ачаа ачих» тоглоом</li>
+          <li>· Зөв зам · Контейнер овоолох · Хос манифест — 3 богино тоглоом</li>
           <li>· 3 удаа оролдож болно, хамгийн сайн оноо тооцогдоно</li>
         </ul>
 
         <Link
           href="/register"
-          className="mt-10 inline-flex min-h-14 items-center justify-center rounded-lg
+          className="enter enter-delay-4 press mt-10 inline-flex min-h-14 items-center justify-center rounded-lg
                      bg-[#C21019] px-8 text-lg font-semibold text-white hover:bg-[#9E0D14]"
         >
           Тоглож урилгаа ав

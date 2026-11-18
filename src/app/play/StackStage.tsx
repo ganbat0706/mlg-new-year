@@ -5,6 +5,7 @@ import { apiPost } from '@/lib/api';
 import { STACK } from '@/lib/config';
 import { cranePosition, maxStackScore, type StackEvent, type StackLevel } from '@/lib/games/stack';
 import { Button } from '@/components/Button';
+import { Loader } from '@/components/Loader';
 
 type Props = {
   attemptId: string;
@@ -132,7 +133,7 @@ export function StackStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'ready') {
     return (
-      <div className="py-10 text-center">
+      <div className="enter py-10 text-center">
         <h2 className="text-3xl font-extrabold tracking-tight">Контейнер овоолох</h2>
         <p className="mx-auto mt-4 max-w-sm text-base leading-relaxed text-[#6B6568]">
           Савалж буй контейнерийг өмнөх овоолгын <strong>төвд тааруулан</strong> «Буулгах» дарж буулга.
@@ -144,7 +145,7 @@ export function StackStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'begin-error') {
     return (
-      <div className="py-10 text-center">
+      <div className="enter py-10 text-center">
         <p role="alert" className="rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
           Тоглоом эхлүүлж чадсангүй. Сүлжээгээ шалгаад дахин оролдоно уу.
         </p>
@@ -154,12 +155,12 @@ export function StackStage({ attemptId, schedule, onDone }: Props) {
   }
 
   if (phase === 'submitting') {
-    return <p className="py-24 text-center text-[#6B6568]">Оноог тооцож байна…</p>;
+    return <Loader label="Оноог тооцож байна…" />;
   }
 
   if (phase === 'submit-error') {
     return (
-      <div className="py-10 text-center">
+      <div className="enter py-10 text-center">
         <p role="alert" className="rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
           Илгээж чадсангүй. Таны тоглолт хадгалагдсан байгаа — дахин оролдоно уу.
         </p>
@@ -170,7 +171,7 @@ export function StackStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'result') {
     return (
-      <p data-testid="stage-result" className="py-24 text-center text-xl font-bold">
+      <p data-testid="stage-result" className="enter py-24 text-center text-xl font-bold">
         Дүн: {resultScore} / {maxStackScore(schedule)}
       </p>
     );
@@ -198,7 +199,7 @@ export function StackStage({ attemptId, schedule, onDone }: Props) {
           {stack.map((pos, i) => (
             <div
               key={i}
-              className="relative mb-0.5 h-8 w-14 -translate-x-1/2 rounded-sm border border-[#FAF7F0]/40 bg-[#ED1C24]"
+              className="obj-mount-centered relative mb-0.5 h-8 w-14 rounded-sm border border-[#FAF7F0]/40 bg-[#ED1C24]"
               style={{ left: `${pos}%` }}
             />
           ))}
@@ -207,7 +208,7 @@ export function StackStage({ attemptId, schedule, onDone }: Props) {
 
       <Button
         data-testid="drop-button"
-        className="mt-3 w-full touch-none"
+        className="press mt-3 w-full touch-none"
         disabled={dropping}
         onPointerDown={drop}
       >

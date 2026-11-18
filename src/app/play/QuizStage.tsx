@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiGet, apiPost } from '@/lib/api';
+import { Loader } from '@/components/Loader';
 
 type Question = {
   position: number;
@@ -22,7 +23,9 @@ export function QuizStage({ attemptId, onDone, onError }: Props) {
   const [question, setQuestion] = useState<Question | null>(null);
   const [remainingMs, setRemainingMs] = useState(0);
   const [locked, setLocked] = useState(false);
+  const [selected, setSelected] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ correct: boolean; points: number } | null>(null);
+  const [timedOut, setTimedOut] = useState(false);
   const deadlineRef = useRef(0);
   // Давхар товшилтыг бодитоор хориглох түгжээ — "locked" state нь зөвхөн харагдах
   // байдал (disabled товч) бөгөөд commit хийгдэхээс өмнө хуучин утгыг уншиж болзошгүй
@@ -35,6 +38,8 @@ export function QuizStage({ attemptId, onDone, onError }: Props) {
 
     answeringRef.current = false;
     setFeedback(null);
+    setSelected(null);
+    setTimedOut(false);
     setLocked(false);
 
     if (res.data === null) { onDone(); return; }
@@ -48,6 +53,8 @@ export function QuizStage({ attemptId, onDone, onError }: Props) {
     if (answeringRef.current || !question) return;
     answeringRef.current = true;
     setLocked(true);
+    setSelected(shownIndex);
+    if (shownIndex === -1) setTimedOut(true);
 
     const res = await apiPost<{ isCorrect: boolean; points: number }>(
       `/api/attempt/${attemptId}/answer`,
@@ -73,7 +80,10 @@ export function QuizStage({ attemptId, onDone, onError }: Props) {
     return () => clearTimeout(t);
   }, [loadNext]);
 
-  // Цаг тоолуур — 100ms тутам шинэчилнэ, 0 болоход автоматаар алгасна.
+  // Цаг тоолуур — 100ms тутам шинэчилнэ, 0 болоход автоматаар алгасна. Энэ нь
+  // зөвхөн тоон харуулалт (секунд) болон автомат алгаслалтад зориулагдсан —
+  // зурвасын өргөнийг ЭНЭ ХУДАЛДААГҮЙ, доорх `.countdown-bar` нь ганцаараа
+  // нэг CSS анимэйшнээр (width 100%→0%, linear, duration=timeLimitMs) явна.
   useEffect(() => {
     if (!question || locked) return;
 
@@ -87,49 +97,72 @@ export function QuizStage({ attemptId, onDone, onError }: Props) {
   }, [question, locked, answer]);
 
   if (!question) {
-    return <p className="py-20 text-center text-[#6B6568]">Ачааллаж байна…</p>;
+    return <Loader label="Ачааллаж байна…" />;
   }
 
-  const pct = (remainingMs / question.timeLimitMs) * 100;
+  const secondsLeft = Math.ceil(remainingMs / 1000);
+  const urgent = remainingMs < 3000;
 
   return (
     <div className="no-select">
       <div className="flex items-baseline justify-between text-sm font-semibold text-[#6B6568]">
         <span>Асуулт {question.position} / {question.total}</span>
-        <span className={remainingMs < 3000 ? 'text-[#C21019]' : ''}>
-          {Math.ceil(remainingMs / 1000)} сек
+        <span className={urgent ? 'text-[#C21019]' : ''}>
+          <span key={secondsLeft} className={urgent ? 'tick-pulse' : ''}>{secondsLeft}</span> сек
         </span>
       </div>
 
       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[#E3DED2]">
         <div
-          className="h-full rounded-full bg-[#ED1C24] transition-[width] duration-100 ease-linear"
-          style={{ width: `${pct}%` }}
+          key={question.questionId}
+          className="countdown-bar"
+          style={{
+            animationDuration: `${question.timeLimitMs}ms`,
+            animationPlayState: locked ? 'paused' : 'running',
+            backgroundColor: urgent ? '#C21019' : '#ED1C24',
+          }}
         />
       </div>
 
-      <h2 className="mt-8 text-2xl font-bold leading-snug">{question.text}</h2>
+      <div key={question.questionId}>
+        <h2 className="quiz-h2-in mt-8 text-2xl font-bold leading-snug">{question.text}</h2>
 
-      <div className="mt-6 space-y-3">
-        {question.options.map((option, i) => (
-          <button
-            key={i}
-            type="button"
-            disabled={locked}
-            onClick={() => void answer(i)}
-            className="min-h-14 w-full rounded-lg border border-[#DAD5CC] bg-white px-5
-                       py-3 text-left text-base font-medium transition
-                       hover:border-[#ED1C24] disabled:opacity-60"
-          >
-            {option}
-          </button>
-        ))}
+        <div className="mt-6 space-y-3">
+          {question.options.map((option, i) => {
+            const isSelected = selected === i;
+            const isWrongTap = isSelected && feedback && !feedback.correct;
+            const isCorrectTap = isSelected && feedback && feedback.correct;
+            return (
+              <button
+                key={i}
+                type="button"
+                disabled={locked}
+                onClick={() => void answer(i)}
+                style={{ animationDelay: `${i * 40}ms` }}
+                className={`quiz-opt-in press min-h-14 w-full rounded-lg border px-5 py-3 text-left
+                           text-base font-medium disabled:cursor-not-allowed ${
+                  isCorrectTap
+                    ? 'border-2 border-[#13693B] bg-[#E6F4EA]'
+                    : isWrongTap
+                      ? 'border-2 border-[#8A0F15] bg-[#FDECEC] shake-x'
+                      : 'border-[#DAD5CC] bg-white hover:border-[#ED1C24] disabled:opacity-60'
+                }`}
+              >
+                {option}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {feedback && (
+      {timedOut ? (
+        <p role="status" className="pts-badge-in mt-6 text-base font-medium text-[#6B6568]">
+          Хугацаа дууслаа
+        </p>
+      ) : feedback && (
         <p
           role="status"
-          className={`mt-6 rounded-lg px-4 py-3 text-base font-semibold ${
+          className={`pts-badge-in mt-6 inline-block rounded-lg px-4 py-3 text-base font-semibold ${
             feedback.correct ? 'bg-[#E6F4EA] text-[#13693B]' : 'bg-[#FDECEC] text-[#8A0F15]'
           }`}
         >

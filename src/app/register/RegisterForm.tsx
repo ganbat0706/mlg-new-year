@@ -80,13 +80,13 @@ export function RegisterForm() {
       </div>
 
       {error && (
-        <p role="alert" className="rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
+        <p role="alert" className="enter-sm rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
           {error}
         </p>
       )}
 
-      <Button type="submit" disabled={busy} className="w-full">
-        {busy ? 'Түр хүлээнэ үү…' : 'Үргэлжлүүлэх'}
+      <Button type="submit" busy={busy} className="w-full">
+        Үргэлжлүүлэх
       </Button>
     </form>
   );

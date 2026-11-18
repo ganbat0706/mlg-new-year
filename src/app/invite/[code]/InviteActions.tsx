@@ -28,7 +28,7 @@ export function InviteActions({ code }: { code: string }) {
         href={`/invite/${code}/image`}
         target="_blank"
         rel="noreferrer"
-        className="inline-flex min-h-12 items-center justify-center rounded-lg
+        className="press inline-flex min-h-12 items-center justify-center rounded-lg
                    border border-[#221E20] px-6 font-semibold hover:bg-[#221E20] hover:text-white"
       >
         Шинэ цонхонд нээх
