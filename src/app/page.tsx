@@ -16,7 +16,7 @@ export default function Home() {
       <Brand />
 
       <div className="flex flex-1 flex-col justify-center py-10">
-        <p className="text-sm font-semibold tracking-[0.2em] text-[#ED1C24]">
+        <p className="text-sm font-semibold tracking-[0.2em] text-[#C21019]">
           ШИНЭ ЖИЛИЙН БАЯР
         </p>
         <h1 className="mt-3 text-5xl font-extrabold leading-none tracking-tight sm:text-6xl">
