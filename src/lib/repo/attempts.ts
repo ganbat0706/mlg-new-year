@@ -46,6 +46,11 @@ export async function startAttempt(registrationId: string): Promise<Result<{
   // байдлаар гүйцэтгэнэ. Ингэснээр нэг тоглогчийн зэрэг ирсэн startAttempt хүсэлтүүд
   // энэ мөр дээр дараалж, зөвхөн нэг нь шинэ оролдлого үүсгэнэ — бусад нь үүнийг
   // үргэлжлүүлнэ. Өөр бүртгэлүүд хоорондоо түгждэггүй (зөвхөн тухайн мөрийн түгжээ).
+  //
+  // ТҮГЖЭЭНИЙ ДАРААЛАЛ: registrations ЭХЭЛЖ, дараа нь attempts — ЯМАГТ.
+  // (registrations before attempts, always.) finishAttempt ч яг энэ дарааллыг
+  // баримталдаг тул хоёр transaction эсрэг чиглэлд түгжиж, Postgres deadlock
+  // үүсгэх боломжгүй.
   return db.transaction(async (tx) => {
     const [reg] = await tx.select().from(registrations)
       .where(eq(registrations.id, registrationId)).for('update').limit(1);
@@ -241,35 +246,48 @@ export async function submitReaction(
 export async function finishAttempt(attemptId: string): Promise<Result<{
   totalScore: number; quizScore: number; reactionScore: number; bestScore: number;
 }>> {
-  const [attempt] = await db.select().from(attempts).where(eq(attempts.id, attemptId)).limit(1);
-  if (!attempt) return fail('Оролдлого олдсонгүй');
-  if (attempt.status !== 'in_progress') return fail('Энэ оролдлого аль хэдийн дууссан байна');
+  // registrationId-г мэдэхийн тулд attempts-ээс урьдчилж уншина — энэ нь түгжээгүй,
+  // transaction-оос гадуурх энгийн SELECT тул дарааллын баталгаанд нөлөөлөхгүй.
+  const [existing] = await db.select({ registrationId: attempts.registrationId })
+    .from(attempts).where(eq(attempts.id, attemptId)).limit(1);
+  if (!existing) return fail('Оролдлого олдсонгүй');
 
-  const answers = await db.select({ points: attemptAnswers.points }).from(attemptAnswers)
-    .where(eq(attemptAnswers.attemptId, attemptId));
-  const quizScore = answers.reduce((sum, a) => sum + a.points, 0);
-  const total = totalScore(quizScore, attempt.reactionScore);
-  const finishedAt = new Date();
+  // ТҮГЖЭЭНИЙ ДАРААЛАЛ: registrations ЭХЭЛЖ, дараа нь attempts — ЯМАГТ.
+  // (registrations before attempts, always.) startAttempt-тэй ижил дарааллыг
+  // баримталж, эсрэг чиглэлийн түгжээнээс Postgres deadlock үүсэхээс сэргийлнэ.
+  return db.transaction(async (tx) => {
+    const [reg] = await tx.select().from(registrations)
+      .where(eq(registrations.id, existing.registrationId)).for('update').limit(1);
+    if (!reg) return fail('Бүртгэл олдсонгүй');
 
-  const bestScore = await db.transaction(async (tx) => {
+    // registrations мөрийг түгжсэний дараа attempts мөрийг дахин уншиж, хамгийн сүүлийн
+    // (тухайлбал давхар finishAttempt дуудлагын эсрэг) төлөвийг баталгаажуулна.
+    const [attempt] = await tx.select().from(attempts)
+      .where(eq(attempts.id, attemptId)).limit(1);
+    if (!attempt) return fail('Оролдлого олдсонгүй');
+    if (attempt.status !== 'in_progress') return fail('Энэ оролдлого аль хэдийн дууссан байна');
+
+    const answers = await tx.select({ points: attemptAnswers.points }).from(attemptAnswers)
+      .where(eq(attemptAnswers.attemptId, attemptId));
+    const quizScore = answers.reduce((sum, a) => sum + a.points, 0);
+    const total = totalScore(quizScore, attempt.reactionScore);
+    const finishedAt = new Date();
+
     await tx.update(attempts).set({
       status: 'completed', quizScore, totalScore: total, finishedAt,
     }).where(eq(attempts.id, attemptId));
 
-    const [reg] = await tx.select().from(registrations)
-      .where(eq(registrations.id, attempt.registrationId)).limit(1);
-
+    let bestScore = reg.bestScore;
     if (total > reg.bestScore) {
       await tx.update(registrations)
         .set({ bestScore: total, bestFinishedAt: finishedAt })
-        .where(eq(registrations.id, attempt.registrationId));
-      return total;
+        .where(eq(registrations.id, existing.registrationId));
+      bestScore = total;
     }
-    return reg.bestScore;
-  });
 
-  return {
-    ok: true,
-    value: { totalScore: total, quizScore, reactionScore: attempt.reactionScore, bestScore },
-  };
+    return {
+      ok: true,
+      value: { totalScore: total, quizScore, reactionScore: attempt.reactionScore, bestScore },
+    };
+  });
 }
