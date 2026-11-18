@@ -15,16 +15,16 @@ describe('normalizeName', () => {
     expect(normalizeName('бат-эрдэнэ')).toBe('Бат-Эрдэнэ');
   });
   it('тоо оруулахад хоосон буцаана', () => {
-    expect(normalizeName(123 as any)).toBe('');
+    expect(normalizeName(123 as unknown as string)).toBe('');
   });
   it('массив оруулахад хоосон буцаана', () => {
-    expect(normalizeName(['бат'] as any)).toBe('');
+    expect(normalizeName(['бат'] as unknown as string)).toBe('');
   });
   it('null оруулахад хоосон буцаана', () => {
-    expect(normalizeName(null as any)).toBe('');
+    expect(normalizeName(null as unknown as string)).toBe('');
   });
   it('undefined оруулахад хоосон буцаана', () => {
-    expect(normalizeName(undefined as any)).toBe('');
+    expect(normalizeName(undefined as unknown as string)).toBe('');
   });
 });
 
@@ -86,22 +86,22 @@ describe('validateName', () => {
   });
 
   it('тоо оруулахад Result буцаана', () => {
-    const r = validateName(123 as any, 'Нэр');
+    const r = validateName(123 as unknown as string, 'Нэр');
     expect(r.ok).toBe(false);
   });
 
   it('массив оруулахад Result буцаана', () => {
-    const r = validateName(['бат'] as any, 'Нэр');
+    const r = validateName(['бат'] as unknown as string, 'Нэр');
     expect(r.ok).toBe(false);
   });
 
   it('null оруулахад Result буцаана', () => {
-    const r = validateName(null as any, 'Нэр');
+    const r = validateName(null as unknown as string, 'Нэр');
     expect(r.ok).toBe(false);
   });
 
   it('undefined оруулахад Result буцаана', () => {
-    const r = validateName(undefined as any, 'Нэр');
+    const r = validateName(undefined as unknown as string, 'Нэр');
     expect(r.ok).toBe(false);
   });
 });
@@ -142,22 +142,22 @@ describe('validatePhone', () => {
   });
 
   it('тоо оруулахад Result буцаана', () => {
-    const r = validatePhone(123 as any);
+    const r = validatePhone(123 as unknown as string);
     expect(r.ok).toBe(false);
   });
 
   it('массив оруулахад Result буцаана', () => {
-    const r = validatePhone(['88112233'] as any);
+    const r = validatePhone(['88112233'] as unknown as string);
     expect(r.ok).toBe(false);
   });
 
   it('null оруулахад Result буцаана', () => {
-    const r = validatePhone(null as any);
+    const r = validatePhone(null as unknown as string);
     expect(r.ok).toBe(false);
   });
 
   it('undefined оруулахад Result буцаана', () => {
-    const r = validatePhone(undefined as any);
+    const r = validatePhone(undefined as unknown as string);
     expect(r.ok).toBe(false);
   });
 });
@@ -172,22 +172,22 @@ describe('validateDepartment', () => {
   });
 
   it('тоо оруулахад Result буцаана', () => {
-    const r = validateDepartment(123 as any, allowed);
+    const r = validateDepartment(123 as unknown as string, allowed);
     expect(r.ok).toBe(false);
   });
 
   it('массив оруулахад Result буцаана', () => {
-    const r = validateDepartment(['Хүний нөөц'] as any, allowed);
+    const r = validateDepartment(['Хүний нөөц'] as unknown as string, allowed);
     expect(r.ok).toBe(false);
   });
 
   it('null оруулахад Result буцаана', () => {
-    const r = validateDepartment(null as any, allowed);
+    const r = validateDepartment(null as unknown as string, allowed);
     expect(r.ok).toBe(false);
   });
 
   it('undefined оруулахад Result буцаана', () => {
-    const r = validateDepartment(undefined as any, allowed);
+    const r = validateDepartment(undefined as unknown as string, allowed);
     expect(r.ok).toBe(false);
   });
 });
