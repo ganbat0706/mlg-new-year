@@ -11,6 +11,21 @@ describe('normalizeName', () => {
   it('аль хэдийн том байвал хэвээр', () => {
     expect(normalizeName('Ганбат')).toBe('Ганбат');
   });
+  it('зураасаас хойш нэрийг томоор болгоно', () => {
+    expect(normalizeName('бат-эрдэнэ')).toBe('Бат-Эрдэнэ');
+  });
+  it('тоо оруулахад хоосон буцаана', () => {
+    expect(normalizeName(123 as any)).toBe('');
+  });
+  it('массив оруулахад хоосон буцаана', () => {
+    expect(normalizeName(['бат'] as any)).toBe('');
+  });
+  it('null оруулахад хоосон буцаана', () => {
+    expect(normalizeName(null as any)).toBe('');
+  });
+  it('undefined оруулахад хоосон буцаана', () => {
+    expect(normalizeName(undefined as any)).toBe('');
+  });
 });
 
 describe('validateName', () => {
@@ -61,6 +76,34 @@ describe('validateName', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain('Овог');
   });
+
+  it('зураасаас төгсөхийг татгалзана', () => {
+    expect(validateName('Бат-', 'Нэр').ok).toBe(false);
+  });
+
+  it('зайгаас төгсөхийг нормалижлаад өнгөрүүлнө', () => {
+    expect(validateName('Бат ', 'Нэр')).toEqual({ ok: true, value: 'Бат' });
+  });
+
+  it('тоо оруулахад Result буцаана', () => {
+    const r = validateName(123 as any, 'Нэр');
+    expect(r.ok).toBe(false);
+  });
+
+  it('массив оруулахад Result буцаана', () => {
+    const r = validateName(['бат'] as any, 'Нэр');
+    expect(r.ok).toBe(false);
+  });
+
+  it('null оруулахад Result буцаана', () => {
+    const r = validateName(null as any, 'Нэр');
+    expect(r.ok).toBe(false);
+  });
+
+  it('undefined оруулахад Result буцаана', () => {
+    const r = validateName(undefined as any, 'Нэр');
+    expect(r.ok).toBe(false);
+  });
 });
 
 describe('validatePhone', () => {
@@ -85,6 +128,38 @@ describe('validatePhone', () => {
   it('үсэг агуулсныг татгалзана', () => {
     expect(validatePhone('8811223a').ok).toBe(false);
   });
+
+  it('976 төрийн код зайтай хүлээн авна', () => {
+    expect(validatePhone('+976 8811-2233')).toEqual({ ok: true, value: '88112233' });
+  });
+
+  it('976 төрийн код зайгүйгээр хүлээн авна', () => {
+    expect(validatePhone('97688112233')).toEqual({ ok: true, value: '88112233' });
+  });
+
+  it('976-аар эхэлсэн байвал орон тоолж шалгана', () => {
+    expect(validatePhone('97612345')).toEqual({ ok: true, value: '97612345' });
+  });
+
+  it('тоо оруулахад Result буцаана', () => {
+    const r = validatePhone(123 as any);
+    expect(r.ok).toBe(false);
+  });
+
+  it('массив оруулахад Result буцаана', () => {
+    const r = validatePhone(['88112233'] as any);
+    expect(r.ok).toBe(false);
+  });
+
+  it('null оруулахад Result буцаана', () => {
+    const r = validatePhone(null as any);
+    expect(r.ok).toBe(false);
+  });
+
+  it('undefined оруулахад Result буцаана', () => {
+    const r = validatePhone(undefined as any);
+    expect(r.ok).toBe(false);
+  });
 });
 
 describe('validateDepartment', () => {
@@ -94,5 +169,25 @@ describe('validateDepartment', () => {
   });
   it('жагсаалтад байхгүйг татгалзана', () => {
     expect(validateDepartment('Сансрын хэлтэс', allowed).ok).toBe(false);
+  });
+
+  it('тоо оруулахад Result буцаана', () => {
+    const r = validateDepartment(123 as any, allowed);
+    expect(r.ok).toBe(false);
+  });
+
+  it('массив оруулахад Result буцаана', () => {
+    const r = validateDepartment(['Хүний нөөц'] as any, allowed);
+    expect(r.ok).toBe(false);
+  });
+
+  it('null оруулахад Result буцаана', () => {
+    const r = validateDepartment(null as any, allowed);
+    expect(r.ok).toBe(false);
+  });
+
+  it('undefined оруулахад Result буцаана', () => {
+    const r = validateDepartment(undefined as any, allowed);
+    expect(r.ok).toBe(false);
   });
 });
