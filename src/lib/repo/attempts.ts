@@ -17,6 +17,9 @@ const fail = (error: string): Result<never> => ({ ok: false, error });
 /** `db.transaction`-ий callback-д өгөгдөх гүйлгээний бариул (tx) — db-тэй ижил query API-тай. */
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+/** `db` эсвэл түүний `tx` — query ажиллуулах аль ч бариулыг хүлээн авдаг функцэд зориулав. */
+type Exec = typeof db | Tx;
+
 /** 30 минутаас удсан in_progress оролдлогыг хүчингүй болгож, оролдлогын тоог буцаана. */
 async function expireStaleAttempts(tx: Tx, registrationId: string): Promise<void> {
   const cutoff = new Date(Date.now() - GAME.ATTEMPT_TIMEOUT_MS);
@@ -130,61 +133,73 @@ export type ServedQuestion = {
 export async function serveNextQuestion(
   attemptId: string,
 ): Promise<Result<ServedQuestion | null>> {
-  const [attempt] = await db.select().from(attempts).where(eq(attempts.id, attemptId)).limit(1);
-  if (!attempt) return fail('Оролдлого олдсонгүй');
-  if (attempt.status !== 'in_progress') return fail('Энэ оролдлого дууссан байна');
+  // serveNextQuestion нь зөвхөн attempts болон attempt_answers хүснэгтэд хандана,
+  // registrations-д огт хүрэхгүй тул "registrations ЭХЭЛЖ, дараа нь attempts — ЯМАГТ"
+  // гэсэн (startAttempt/finishAttempt-ийн) түгжээний дарааллыг эвдэх эрсдэлгүй.
+  //
+  // Бүх шийдвэрийг нэг гүйлгээнд, тухайн attempt мөрийг FOR UPDATE-ээр түгжсэн
+  // байдлаар гүйцэтгэнэ. Ингэснээр нэг оролдлогод зэрэг ирсэн serveNextQuestion
+  // хүсэлтүүд дараалж, зөвхөн нэг нь шинэ асуулт үүсгэнэ — бусад нь ижил (pending)
+  // асуултыг буцаана. Өөр attempt-үүд хоорондоо түгждэггүй.
+  return db.transaction(async (tx) => {
+    const [attempt] = await tx.select().from(attempts)
+      .where(eq(attempts.id, attemptId)).for('update').limit(1);
+    if (!attempt) return fail('Оролдлого олдсонгүй');
+    if (attempt.status !== 'in_progress') return fail('Энэ оролдлого дууссан байна');
 
-  const served = await db.select().from(attemptAnswers)
-    .where(eq(attemptAnswers.attemptId, attemptId))
-    .orderBy(asc(attemptAnswers.position));
+    const served = await tx.select().from(attemptAnswers)
+      .where(eq(attemptAnswers.attemptId, attemptId))
+      .orderBy(asc(attemptAnswers.position));
 
-  // Хариулаагүй асуулт байвал ижлийг нь буцаана (refresh хийсэн тохиолдол).
-  const pending = served.find((a) => a.answeredAt === null);
-  if (pending) {
-    const q = await loadQuestion(pending.questionId);
+    // Хариулаагүй асуулт байвал ижлийг нь буцаана (refresh хийсэн тохиолдол,
+    // эсвэл зэрэг ирсэн хүсэлтийн хоёр дахь нь).
+    const pending = served.find((a) => a.answeredAt === null);
+    if (pending) {
+      const q = await loadQuestion(tx, pending.questionId);
+      if (!q) return fail('Асуулт олдсонгүй');
+      return {
+        ok: true,
+        value: {
+          position: pending.position,
+          total: QUIZ.QUESTION_COUNT,
+          questionId: q.id,
+          text: q.text,
+          options: applyOptionOrder(q.options, pending.optionOrder),
+          timeLimitMs: QUIZ.TIME_LIMIT_MS,
+        },
+      };
+    }
+
+    const position = served.length + 1;
+    if (position > QUIZ.QUESTION_COUNT) return { ok: true, value: null };
+
+    const questionId = attempt.questionIds[position - 1];
+    const q = await loadQuestion(tx, questionId);
     if (!q) return fail('Асуулт олдсонгүй');
+
+    const rng = mulberry32(attempt.seed + position);
+    const optionOrder = buildOptionOrder(q.options.length, rng);
+
+    await tx.insert(attemptAnswers).values({
+      attemptId, questionId, position, optionOrder, servedAt: new Date(),
+    });
+
     return {
       ok: true,
       value: {
-        position: pending.position,
+        position,
         total: QUIZ.QUESTION_COUNT,
         questionId: q.id,
         text: q.text,
-        options: applyOptionOrder(q.options, pending.optionOrder),
+        options: applyOptionOrder(q.options, optionOrder),
         timeLimitMs: QUIZ.TIME_LIMIT_MS,
       },
     };
-  }
-
-  const position = served.length + 1;
-  if (position > QUIZ.QUESTION_COUNT) return { ok: true, value: null };
-
-  const questionId = attempt.questionIds[position - 1];
-  const q = await loadQuestion(questionId);
-  if (!q) return fail('Асуулт олдсонгүй');
-
-  const rng = mulberry32(attempt.seed + position);
-  const optionOrder = buildOptionOrder(q.options.length, rng);
-
-  await db.insert(attemptAnswers).values({
-    attemptId, questionId, position, optionOrder, servedAt: new Date(),
   });
-
-  return {
-    ok: true,
-    value: {
-      position,
-      total: QUIZ.QUESTION_COUNT,
-      questionId: q.id,
-      text: q.text,
-      options: applyOptionOrder(q.options, optionOrder),
-      timeLimitMs: QUIZ.TIME_LIMIT_MS,
-    },
-  };
 }
 
-async function loadQuestion(id: number) {
-  const [q] = await db.select().from(questions).where(eq(questions.id, id)).limit(1);
+async function loadQuestion(exec: Exec, id: number) {
+  const [q] = await exec.select().from(questions).where(eq(questions.id, id)).limit(1);
   return q ?? null;
 }
 
@@ -205,7 +220,7 @@ export async function submitAnswer(
     )).limit(1);
   if (!row) return fail('Энэ асуулт өгөгдөөгүй эсвэл аль хэдийн хариулсан байна');
 
-  const q = await loadQuestion(questionId);
+  const q = await loadQuestion(db, questionId);
   if (!q) return fail('Асуулт олдсонгүй');
 
   const answeredAt = new Date();

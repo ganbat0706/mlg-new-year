@@ -6,8 +6,8 @@ import { registerOrGet } from '@/lib/repo/registrations';
 import { resetDb, seedQuestions } from './helpers/db';
 import { QUIZ, REACTION, GAME } from '@/lib/config';
 import { db } from '@/lib/db';
-import { attempts, registrations } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { attempts, attemptAnswers, registrations } from '@/lib/db/schema';
+import { and, eq } from 'drizzle-orm';
 
 const input = {
   lastName: 'батхүү', firstName: 'ганбат',
@@ -193,6 +193,42 @@ describe('serveNextQuestion', () => {
   });
 });
 
+describe('serveNextQuestion - зэрэгцээ (concurrency)', () => {
+  it('нэг оролдлогод зэрэг ирсэн 5 хүсэлт яг нэг л асуулт үүсгэнэ', async () => {
+    const reg = await newRegistration();
+    const a = await startAttempt(reg.id);
+    if (!a.ok) throw new Error(a.error);
+
+    for (let round = 1; round <= QUIZ.QUESTION_COUNT; round++) {
+      const results = await Promise.all(
+        Array.from({ length: 5 }, () => serveNextQuestion(a.value.attemptId)),
+      );
+      for (const r of results) expect(r.ok).toBe(true);
+
+      const questionIds = new Set(results.map((r) => (r.ok && r.value ? r.value.questionId : -1)));
+      const positions = new Set(results.map((r) => (r.ok && r.value ? r.value.position : -1)));
+      expect(questionIds.size).toBe(1); // бүгд ижил questionId буцаасан
+      expect(positions.size).toBe(1); // бүгд ижил position буцаасан
+      expect([...positions][0]).toBe(round);
+
+      const rows = await db.select().from(attemptAnswers)
+        .where(eq(attemptAnswers.attemptId, a.value.attemptId));
+      expect(rows.length).toBe(round); // давхар INSERT хийгдээгүй — яг round мөр
+
+      const first = results.find((r) => r.ok && r.value);
+      if (!first || !first.ok || !first.value) throw new Error('асуулт алга');
+      await submitAnswer(a.value.attemptId, first.value.questionId, 0);
+    }
+
+    const finalRows = await db.select().from(attemptAnswers)
+      .where(eq(attemptAnswers.attemptId, a.value.attemptId));
+    expect(finalRows.length).toBe(QUIZ.QUESTION_COUNT); // нийт яг QUESTION_COUNT мөр, илүүгүй
+
+    const extra = await serveNextQuestion(a.value.attemptId);
+    expect(extra.ok && extra.value).toBeNull();
+  });
+});
+
 describe('submitAnswer', () => {
   it('зөв хариултад оноо өгнө', async () => {
     const reg = await newRegistration();
@@ -258,6 +294,45 @@ describe('submitAnswer', () => {
     const r = await submitAnswer(a.value.attemptId, q.value.questionId, 99);
     expect(r.ok && r.value.isCorrect).toBe(false);
     expect(r.ok && r.value.points).toBe(0);
+  });
+});
+
+describe('submitAnswer - зэрэгцээ (concurrency)', () => {
+  // submitAnswer нь INSERT биш, зөвхөн UPDATE хийдэг тул зэрэг ирсэн хариултууд
+  // ижил мөрийг дахин дахин бичихээс цааш хэтрэхгүй — хэд дуудагдсан ч нэг л мөр
+  // байсаар, оноо нэмэгдэж давхардахгүй (сүүлд бичсэн нь үлдэнэ). Энэ тестээр
+  // тэдгээрийг баталгаажуулна.
+  it('нэг асуултад зэрэг ирсэн хариултууд оноог давхардуулахгүй', async () => {
+    const reg = await newRegistration();
+    const a = await startAttempt(reg.id);
+    if (!a.ok) throw new Error(a.error);
+    const q = await serveNextQuestion(a.value.attemptId);
+    if (!q.ok || !q.value) throw new Error('асуулт алга');
+
+    const correctLetter = ['A', 'B', 'C', 'D'][q.value.questionId % 4];
+    const shownIndex = q.value.options.indexOf(correctLetter);
+    const { questionId } = q.value;
+
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () => submitAnswer(a.value.attemptId, questionId, shownIndex)),
+    );
+    for (const r of results) expect(r.ok).toBe(true);
+
+    const rows = await db.select().from(attemptAnswers)
+      .where(and(
+        eq(attemptAnswers.attemptId, a.value.attemptId),
+        eq(attemptAnswers.questionId, questionId),
+      ));
+    expect(rows.length).toBe(1); // нэг л мөр — INSERT болоогүй, зөвхөн UPDATE
+
+    const finish = await finishAttempt(a.value.attemptId);
+    expect(finish.ok).toBe(true);
+    if (!finish.ok) return;
+    // Нэг асуултын боломжит дээд онооноос (хурдны урамшуулал орсон ч) хэтрэхгүй —
+    // зэрэг ирсэн 5 хүсэлт нэг мөрийг дахин дахин бичсэнээс цааш оноо нэмэгдээгүй.
+    expect(finish.value.quizScore).toBeLessThanOrEqual(
+      QUIZ.BASE_POINTS + (QUIZ.TIME_LIMIT_MS / 1000) * QUIZ.SPEED_POINTS_PER_SECOND,
+    );
   });
 });
 
