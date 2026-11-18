@@ -84,6 +84,14 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
   const rawScoreRef = useRef(0);
   const submittingRef = useRef(false);
   const beginningRef = useRef(false);
+  // Латч — StackStage-ийн `droppingRef`-тэй ЯГ ИЖИЛ хэлбэр: гар дотор (await-гүй,
+  // синхрон) хамгийн эхэнд шалгаж, тавигдана. Хоёр pointerdown нэг JS tick-д
+  // (жинхэнэ хоёр дахин товшилт биш, нэг л даралтаас ирсэн давхардсан эвент)
+  // ирвэл хоёр дахь нь энд ШУУД хаагдана — `i`-г ахиулахаас ч өмнө. Дараагийн
+  // зүйл дэлгэц дээр ҮНЭХЭЭР гарч ирмэгц (`index`-ийн өөрчлөлтийн дараах effect)
+  // суллагдана — жинхэнэ хурдан тоглогчийн (секунд тутамд нэг товшилт гэх мэт)
+  // хоёр дахь товшилтыг хэзээ ч хаахгүй.
+  const tappingRef = useRef(false);
 
   const submit = useCallback(async () => {
     // Латч — submit хоёр удаа (цаг дуусах ба сүүлийн товшилт зэрэг ирвэл) явахаас хамгаална.
@@ -122,6 +130,12 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
     return () => cancelAnimationFrame(frame);
   }, [phase, submit, schedule.length]);
 
+  // `index` өөрчлөгдөж, шинэ зүйл дэлгэц дээр гарч ирмэгц (commit хийгдсэний
+  // дараах effect) л товшилтын латчийг суллана.
+  useEffect(() => {
+    tappingRef.current = false;
+  }, [index]);
+
   async function begin() {
     if (beginningRef.current) return;
     beginningRef.current = true;
@@ -137,6 +151,7 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
     eventsRef.current = [];
     rawScoreRef.current = 0;
     submittingRef.current = false;
+    tappingRef.current = false;
     setIndex(0);
     setLiveScore(0);
     setRemaining(SORT.DURATION_MS);
@@ -146,8 +161,15 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
   // `t` нь дуудагдах мөчид (onPointerDown handler дотор) тооцогдоно — цаашид
   // жинхэнэ дарах мөчөөс хойш ямар ч async/re-render хоцролт орохгүй.
   function tap(lane: SortLane, t: number) {
+    // Латч — ХАМГИЙН ЭХЭНД, синхроноор шалгаж, тавигдана (StackStage-ийн
+    // droppingRef-тэй ижил хэлбэр). Нэг л даралтаас хоёр pointerdown нэг
+    // tick-д ирвэл хоёр дахь нь энд зогсоно — `i`-г уншихаас ч өмнө, тул
+    // буруу зүйлийг онооход хэзээ ч хүрэхгүй.
+    if (tappingRef.current) return;
+    tappingRef.current = true;
+
     const i = indexRef.current;
-    if (phase !== 'running' || i >= schedule.length) return;
+    if (phase !== 'running' || i >= schedule.length) { tappingRef.current = false; return; }
     // Латч — энэ синхрон товшилтыг индексийг ШУУД ахиулж хаана (await-аас өмнө).
     indexRef.current = i + 1;
 
