@@ -36,7 +36,7 @@ export default function Home() {
         <Link
           href="/register"
           className="mt-10 inline-flex min-h-14 items-center justify-center rounded-lg
-                     bg-[#ED1C24] px-8 text-lg font-semibold text-white hover:bg-[#C21019]"
+                     bg-[#C21019] px-8 text-lg font-semibold text-white hover:bg-[#9E0D14]"
         >
           Тоглож урилгаа ав
         </Link>
