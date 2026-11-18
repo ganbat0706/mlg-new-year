@@ -4,18 +4,24 @@ import { hitRateLimit, clientIp, resetRateLimit } from '@/lib/rate-limit';
 beforeEach(() => { resetRateLimit(); });
 
 describe('hitRateLimit', () => {
-  it('эхний 10 хүсэлтийг зөвшөөрнө', () => {
-    for (let i = 0; i < 10; i++) expect(hitRateLimit('1.1.1.1')).toBe(false);
+  it('эхний 60 хүсэлтийг зөвшөөрнө', () => {
+    for (let i = 0; i < 60; i++) expect(hitRateLimit('register', '1.1.1.1')).toBe(false);
   });
 
-  it('11 дэх хүсэлтийг татгалзана', () => {
-    for (let i = 0; i < 10; i++) hitRateLimit('1.1.1.1');
-    expect(hitRateLimit('1.1.1.1')).toBe(true);
+  it('61 дэх хүсэлтийг татгалзана', () => {
+    for (let i = 0; i < 60; i++) hitRateLimit('register', '1.1.1.1');
+    expect(hitRateLimit('register', '1.1.1.1')).toBe(true);
   });
 
   it('өөр IP-д нөлөөлөхгүй', () => {
-    for (let i = 0; i < 10; i++) hitRateLimit('1.1.1.1');
-    expect(hitRateLimit('2.2.2.2')).toBe(false);
+    for (let i = 0; i < 60; i++) hitRateLimit('register', '1.1.1.1');
+    expect(hitRateLimit('register', '2.2.2.2')).toBe(false);
+  });
+
+  it('ижил IP ч өөр scope-д нөлөөлөхгүй — нэг endpoint нөгөөг нь өлсгөхгүй', () => {
+    for (let i = 0; i < 60; i++) hitRateLimit('standing', '1.1.1.1');
+    expect(hitRateLimit('standing', '1.1.1.1')).toBe(true);
+    expect(hitRateLimit('register', '1.1.1.1')).toBe(false);
   });
 });
 

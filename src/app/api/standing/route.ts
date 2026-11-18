@@ -8,7 +8,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request): Promise<Response> {
-  if (hitRateLimit(clientIp(req))) {
+  if (hitRateLimit('standing', clientIp(req))) {
     return bad('Хэт олон удаа оролдлоо. Минут хүлээгээд дахин оролдоно уу.', 429);
   }
 

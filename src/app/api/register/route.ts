@@ -13,7 +13,7 @@ type Body = {
 export async function POST(req: Request): Promise<Response> {
   if (!isGameOpen()) return closed();
 
-  if (hitRateLimit(clientIp(req))) {
+  if (hitRateLimit('register', clientIp(req))) {
     return bad('Хэт олон удаа оролдлоо. Минут хүлээгээд дахин оролдоно уу.', 429);
   }
 

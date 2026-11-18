@@ -6,6 +6,16 @@ type Row = {
   isPrize: boolean;
 };
 
+/**
+ * Монгол уламжлалаар жагсаалтад нэрийг «Овгийн эхний үсэг. Нэр» хэлбэрээр
+ * харуулна — жишээ нь «Ц. Отгонбаяр». `lastName` хоосон бол (ер нь тохиолдохгүй
+ * ч) цоохор ". Нэр" гарахаас сэргийлж зөвхөн нэрийг үлдээнэ.
+ */
+function displayName(lastName: string, firstName: string): string {
+  const initial = lastName.trim().charAt(0);
+  return initial ? `${initial}. ${firstName}` : firstName;
+}
+
 export function LeaderTable({
   rows, highlightRank,
 }: { rows: Row[]; highlightRank?: number | null }) {
@@ -40,7 +50,7 @@ export function LeaderTable({
                     <span className="ml-1.5 text-sm text-[#C21019]" title="Шагналтай байр">★</span>
                   )}
                 </td>
-                <td className="truncate px-3 py-2.5">{r.lastName} {r.firstName}</td>
+                <td className="truncate px-3 py-2.5">{displayName(r.lastName, r.firstName)}</td>
                 <td className="truncate px-3 py-2.5 text-right tabular-nums">
                   {r.bestScore.toLocaleString('mn-MN')}
                 </td>
