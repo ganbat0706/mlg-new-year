@@ -26,6 +26,7 @@ export function QuizStage({ attemptId, onDone, onError }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ correct: boolean; points: number } | null>(null);
   const [timedOut, setTimedOut] = useState(false);
+  const [submitFailed, setSubmitFailed] = useState(false);
   const deadlineRef = useRef(0);
   // Давхар товшилтыг бодитоор хориглох түгжээ — "locked" state нь зөвхөн харагдах
   // байдал (disabled товч) бөгөөд commit хийгдэхээс өмнө хуучин утгыг уншиж болзошгүй
@@ -40,6 +41,7 @@ export function QuizStage({ attemptId, onDone, onError }: Props) {
     setFeedback(null);
     setSelected(null);
     setTimedOut(false);
+    setSubmitFailed(false);
     setLocked(false);
 
     if (res.data === null) { onDone(); return; }
@@ -65,9 +67,11 @@ export function QuizStage({ attemptId, onDone, onError }: Props) {
       // Сервер татгалзсан — сүлжээ тасарсан эсвэл асуулт аль хэдийн хариулагдсан
       // (давхар бичлэгийн зэрэгцээ хүсэлтийн тохиолдол) байж болно. Аль ч тохиолдолд
       // тоглогч зөв хариулсан эсэхийг бид мэдэхгүй тул «Буруу» гэж буруу мэдээлэхгүй —
-      // feedback үзүүлэхгүйгээр шууд дараагийн (эсвэл ижил, хариулаагүй хэвээр байгаа)
-      // асуулт руу шилжинэ.
-      void loadNext();
+      // гэхдээ бүрэн чимээгүй ч үлдээхгүй: богино, цочроохгүй мэдэгдэл үзүүлээд
+      // (хариулт магадгүй хадгалагдаагүй, ижил асуулт дахин гарч болзошгүй),
+      // урсгалыг блоклохгүйгээр богино хугацааны дараа дараагийн асуулт руу шилжинэ.
+      setSubmitFailed(true);
+      setTimeout(() => { void loadNext(); }, 900);
       return;
     }
 
@@ -155,7 +159,11 @@ export function QuizStage({ attemptId, onDone, onError }: Props) {
         </div>
       </div>
 
-      {timedOut ? (
+      {submitFailed ? (
+        <p role="status" className="pts-badge-in mt-6 text-base font-medium text-[#6B6568]">
+          Илгээгдсэнгүй — энэ асуулт дахин гарч магадгүй
+        </p>
+      ) : timedOut ? (
         <p role="status" className="pts-badge-in mt-6 text-base font-medium text-[#6B6568]">
           Хугацаа дууслаа
         </p>

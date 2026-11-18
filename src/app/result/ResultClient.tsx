@@ -87,13 +87,18 @@ export function ResultClient({ gameOpen }: { gameOpen: boolean }) {
             <strong>{session.inviteCode}</strong>
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <Link
-              href={`/invite/${session.inviteCode}`}
-              className="press inline-flex min-h-12 items-center justify-center rounded-lg
-                         bg-[#C21019] px-6 font-semibold text-white hover:bg-[#9E0D14]"
-            >
-              Урилгаа харах
-            </Link>
+            {/* Шинэ finish (ScoreCard) байгаа үед тэндээс аль хэдийн "Урилгаа
+                харах" товч гардаг — энд давхардуулахгүй. Энэ товч зөвхөн дахин
+                зочлоход (шинэ үр дүнгүй үед) гарч ирнэ. */}
+            {!finish && (
+              <Link
+                href={`/invite/${session.inviteCode}`}
+                className="press inline-flex min-h-12 items-center justify-center rounded-lg
+                           bg-[#C21019] px-6 font-semibold text-white hover:bg-[#9E0D14]"
+              >
+                Урилгаа харах
+              </Link>
+            )}
             {gameOpen && session.attemptsLeft > 0 && (
               <Link
                 href="/play"
