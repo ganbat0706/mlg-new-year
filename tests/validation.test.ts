@@ -81,6 +81,12 @@ describe('validateName', () => {
     expect(validateName('Бат-', 'Нэр').ok).toBe(false);
   });
 
+  it('дараалсан хос зураасыг татгалзана', () => {
+    const r = validateName('бат--эрдэнэ', 'Нэр');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('кирилл');
+  });
+
   it('зайгаас төгсөхийг нормалижлаад өнгөрүүлнө', () => {
     expect(validateName('Бат ', 'Нэр')).toEqual({ ok: true, value: 'Бат' });
   });

@@ -208,32 +208,49 @@ export async function submitAnswer(
   questionId: number,
   shownIndex: number,
 ): Promise<Result<{ isCorrect: boolean; points: number }>> {
-  const [attempt] = await db.select().from(attempts).where(eq(attempts.id, attemptId)).limit(1);
-  if (!attempt) return fail('Оролдлого олдсонгүй');
-  if (attempt.status !== 'in_progress') return fail('Энэ оролдлого дууссан байна');
+  // submitAnswer нь зөвхөн attempts болон attempt_answers хүснэгтэд хандана,
+  // registrations-д огт хүрэхгүй тул "registrations ЭХЭЛЖ, дараа нь attempts — ЯМАГТ"
+  // гэсэн (startAttempt/finishAttempt/serveNextQuestion-ийн) түгжээний дарааллыг
+  // эвдэх эрсдэлгүй.
+  //
+  // Бүх шийдвэрийг нэг гүйлгээнд, тухайн attempt мөрийг FOR UPDATE-ээр түгжсэн
+  // байдлаар гүйцэтгэнэ. Ингэснээр нэг асуултад зэрэг ирсэн submitAnswer хүсэлтүүд
+  // дараалж, зөвхөн нэг нь оноо тооцож бичнэ — бусад нь (түгжээ суллагдсаны дараа
+  // answeredAt аль хэдийн тавигдсаныг хараад) "аль хэдийн хариулсан" гэсэн алдаа
+  // буцаана, isCorrect тооцохгүй. Үгүй бол энэ зам "хариулт оракул" болж, зэрэг
+  // ирсэн олон хүсэлт бүр өөрийн isCorrect-ийг хүлээн авч зөв хариултыг илрүүлэх
+  // боломжтой болдог байв.
+  return db.transaction(async (tx) => {
+    const [attempt] = await tx.select().from(attempts)
+      .where(eq(attempts.id, attemptId)).for('update').limit(1);
+    if (!attempt) return fail('Оролдлого олдсонгүй');
+    if (attempt.status !== 'in_progress') return fail('Энэ оролдлого дууссан байна');
 
-  const [row] = await db.select().from(attemptAnswers)
-    .where(and(
-      eq(attemptAnswers.attemptId, attemptId),
-      eq(attemptAnswers.questionId, questionId),
-      isNull(attemptAnswers.answeredAt),
-    )).limit(1);
-  if (!row) return fail('Энэ асуулт өгөгдөөгүй эсвэл аль хэдийн хариулсан байна');
+    // attempts мөрийг түгжсэний дараа attempt_answers мөрийг дахин уншиж,
+    // "хариулаагүй" төлөвийг хамгийн сүүлийн үнэн эх сурвалжаас баталгаажуулна.
+    const [row] = await tx.select().from(attemptAnswers)
+      .where(and(
+        eq(attemptAnswers.attemptId, attemptId),
+        eq(attemptAnswers.questionId, questionId),
+        isNull(attemptAnswers.answeredAt),
+      )).limit(1);
+    if (!row) return fail('Энэ асуулт өгөгдөөгүй эсвэл аль хэдийн хариулсан байна');
 
-  const q = await loadQuestion(db, questionId);
-  if (!q) return fail('Асуулт олдсонгүй');
+    const q = await loadQuestion(tx, questionId);
+    if (!q) return fail('Асуулт олдсонгүй');
 
-  const answeredAt = new Date();
-  const elapsedMs = answeredAt.getTime() - row.servedAt.getTime();
-  const originalIndex = resolveChoice(row.optionOrder, shownIndex);
-  const isCorrect = originalIndex === q.correctIndex;
-  const points = scoreAnswer(isCorrect, elapsedMs);
+    const answeredAt = new Date();
+    const elapsedMs = answeredAt.getTime() - row.servedAt.getTime();
+    const originalIndex = resolveChoice(row.optionOrder, shownIndex);
+    const isCorrect = originalIndex === q.correctIndex;
+    const points = scoreAnswer(isCorrect, elapsedMs);
 
-  await db.update(attemptAnswers)
-    .set({ answeredAt, choiceIndex: originalIndex, isCorrect, points })
-    .where(eq(attemptAnswers.id, row.id));
+    await tx.update(attemptAnswers)
+      .set({ answeredAt, choiceIndex: originalIndex, isCorrect, points })
+      .where(eq(attemptAnswers.id, row.id));
 
-  return { ok: true, value: { isCorrect, points } };
+    return { ok: true, value: { isCorrect, points } };
+  });
 }
 
 export async function submitReaction(

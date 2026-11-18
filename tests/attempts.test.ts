@@ -298,11 +298,14 @@ describe('submitAnswer', () => {
 });
 
 describe('submitAnswer - зэрэгцээ (concurrency)', () => {
-  // submitAnswer нь INSERT биш, зөвхөн UPDATE хийдэг тул зэрэг ирсэн хариултууд
-  // ижил мөрийг дахин дахин бичихээс цааш хэтрэхгүй — хэд дуудагдсан ч нэг л мөр
-  // байсаар, оноо нэмэгдэж давхардахгүй (сүүлд бичсэн нь үлдэнэ). Энэ тестээр
-  // тэдгээрийг баталгаажуулна.
-  it('нэг асуултад зэрэг ирсэн хариултууд оноог давхардуулахгүй', async () => {
+  // submitAnswer одоо attempts мөрийг FOR UPDATE-ээр түгжиж, нэг гүйлгээн дотор
+  // ажилладаг тул нэг асуултад зэрэг ирсэн хариултуудаас ЗӨВХӨН НЭГ нь амжилттай
+  // болж, бусад нь (түгжээ суллагдсаны дараа answeredAt аль хэдийн тавигдсаныг
+  // хараад) "аль хэдийн хариулсан" гэж татгалзана. Чухал нь: татгалзсан хариулт
+  // isCorrect-ийг ил гаргахгүй — үгүй бол зэрэг ирсэн олон хүсэлт бүр өөрийн
+  // isCorrect-ийг хүлээн авч зөв хариултыг илрүүлэх "оракул" болдог байсан (нэг
+  // асуулт, олон оролдлого → зөв хувилбарыг таамаглалгүй олох боломж).
+  it('нэг асуултад зэрэг ирсэн хариултуудаас зөвхөн нэг амжилттай болж, isCorrect ил гарахгүй', async () => {
     const reg = await newRegistration();
     const a = await startAttempt(reg.id);
     if (!a.ok) throw new Error(a.error);
@@ -316,20 +319,40 @@ describe('submitAnswer - зэрэгцээ (concurrency)', () => {
     const results = await Promise.all(
       Array.from({ length: 5 }, () => submitAnswer(a.value.attemptId, questionId, shownIndex)),
     );
-    for (const r of results) expect(r.ok).toBe(true);
+
+    const succeeded = results.filter((r) => r.ok);
+    const failed = results.filter((r) => !r.ok);
+    expect(succeeded.length).toBe(1); // яг нэг л амжилттай
+    expect(failed.length).toBe(4); // бусад дөрвөөс бүгд татгалзсан
+
+    // Татгалзсан хариултууд isCorrect (эсвэл ямар ч оноо/зөв мэдээлэл) агуулахгүй —
+    // "хариулт оракул" хаагдсан эсэхийг шалгана.
+    for (const r of failed) {
+      expect(r).not.toHaveProperty('value');
+      expect(JSON.stringify(r)).not.toContain('isCorrect');
+    }
 
     const rows = await db.select().from(attemptAnswers)
       .where(and(
         eq(attemptAnswers.attemptId, a.value.attemptId),
         eq(attemptAnswers.questionId, questionId),
       ));
-    expect(rows.length).toBe(1); // нэг л мөр — INSERT болоогүй, зөвхөн UPDATE
+    expect(rows.length).toBe(1); // нэг л мөр — давхар INSERT хийгдээгүй
+    expect(rows[0].answeredAt).not.toBeNull(); // яг нэг мөр answeredAt-тай болсон
+
+    // Хадгалагдсан points нь амжилттай болсон цорын ганц хариултын буцаасан
+    // points-той яг таарна — сүүлд бичсэн нь санамсаргүй ялгаатай оноогоор
+    // дарагдаагүй.
+    const [succeededResult] = succeeded;
+    if (succeededResult.ok) {
+      expect(rows[0].points).toBe(succeededResult.value.points);
+      expect(rows[0].isCorrect).toBe(succeededResult.value.isCorrect);
+    }
 
     const finish = await finishAttempt(a.value.attemptId);
     expect(finish.ok).toBe(true);
     if (!finish.ok) return;
-    // Нэг асуултын боломжит дээд онооноос (хурдны урамшуулал орсон ч) хэтрэхгүй —
-    // зэрэг ирсэн 5 хүсэлт нэг мөрийг дахин дахин бичсэнээс цааш оноо нэмэгдээгүй.
+    // Нэг асуултын боломжит дээд онооноос (хурдны урамшуулал орсон ч) хэтрэхгүй.
     expect(finish.value.quizScore).toBeLessThanOrEqual(
       QUIZ.BASE_POINTS + (QUIZ.TIME_LIMIT_MS / 1000) * QUIZ.SPEED_POINTS_PER_SECOND,
     );

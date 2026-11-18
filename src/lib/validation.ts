@@ -31,7 +31,7 @@ export function validateName(raw: string, field: string): Result<string> {
   if (value.length < NAME_MIN || value.length > NAME_MAX) {
     return { ok: false, error: `${field} ${NAME_MIN}-${NAME_MAX} тэмдэгт байх ёстой` };
   }
-  if (!NAME_RE.test(value) || /[\s-]$/.test(value)) {
+  if (!NAME_RE.test(value) || /[\s-]$/.test(value) || /-{2,}/.test(value)) {
     return { ok: false, error: `${field}-ээ кирилл үсгээр бичнэ үү` };
   }
   return { ok: true, value };

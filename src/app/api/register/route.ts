@@ -11,8 +11,6 @@ type Body = {
 };
 
 export async function POST(req: Request): Promise<Response> {
-  if (!isGameOpen()) return closed();
-
   if (hitRateLimit('register', clientIp(req))) {
     return bad('Хэт олон удаа оролдлоо. Минут хүлээгээд дахин оролдоно уу.', 429);
   }
@@ -21,6 +19,12 @@ export async function POST(req: Request): Promise<Response> {
   if (!body) return bad('Өгөгдөл буруу байна');
 
   try {
+    // isGameOpen() нь GAME_CLOSES_AT орчны хувьсагч алга эсвэл буруу форматтай бол
+    // throw хийдэг (gameClosesAt()) — try дотор байрлуулснаар энэ алдааг доорх
+    // catch (boom()) барьж, цоожтой орчны тохиргооны алдаа нь хоосон 500 биш,
+    // лог бүхий цэвэр хариу болно.
+    if (!isGameOpen()) return closed();
+
     const result = await registerOrGet({
       lastName: body.lastName ?? '',
       firstName: body.firstName ?? '',
