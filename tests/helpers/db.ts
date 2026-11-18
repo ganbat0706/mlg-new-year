@@ -1,12 +1,13 @@
 import { sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { ensureInviteSequence } from '../../scripts/db-setup';
+import { ensureInviteSequence, ensureOneOpenAttemptIndex } from '../../scripts/db-setup';
 
 /** Тест бүрийн өмнө DB-г цэвэрлэж, sequence-ийг 1 рүү буцаана. */
 export async function resetDb(): Promise<void> {
-  // Шинэ (цэвэр) өгөгдлийн сан дээр sequence байхгүй байж болзошгүй тул
-  // RESTART-аас өмнө үүсгэх ёстойг баталгаажуулна (идемпотент).
+  // Шинэ (цэвэр) өгөгдлийн сан дээр sequence болон concurrency-хамгаалах индекс
+  // байхгүй байж болзошгүй тул цэвэрлэхийн өмнө үүсгэх ёстойг баталгаажуулна (идемпотент).
   await ensureInviteSequence();
+  await ensureOneOpenAttemptIndex();
   await db.execute(sql`TRUNCATE attempt_answers, attempts, registrations RESTART IDENTITY CASCADE`);
   await db.execute(sql`ALTER SEQUENCE invite_seq_counter RESTART WITH 1`);
 }

@@ -88,6 +88,56 @@ describe('startAttempt', () => {
   });
 });
 
+describe('startAttempt - зэрэгцээ (concurrency)', () => {
+  it('нэг бүртгэлд зэрэг ирсэн 10 хүсэлт яг нэг л оролдлого үүсгэнэ', async () => {
+    const reg = await newRegistration();
+
+    // 1-р үе: шинэ бүртгэлд 10 startAttempt хүсэлт зэрэг ирнэ.
+    // FOR UPDATE түгжээгүй бол хэд хэдэн in_progress мөр үүсч, attemptsUsed
+    // хэт их нэмэгдэх эрсдэлтэй байсан (reviewer-ийн илрүүлсэн согог).
+    const firstRound = await Promise.all(
+      Array.from({ length: 10 }, () => startAttempt(reg.id)),
+    );
+    for (const r of firstRound) expect(r.ok).toBe(true);
+
+    const firstIds = new Set(firstRound.map((r) => (r.ok ? r.value.attemptId : 'FAIL')));
+    expect(firstIds.size).toBe(1); // бүх хүсэлт яг ижил attemptId буцаасан
+
+    const [reg1] = await db.select().from(registrations).where(eq(registrations.id, reg.id));
+    expect(reg1.attemptsUsed).toBe(1);
+
+    const rows1 = await db.select().from(attempts).where(eq(attempts.registrationId, reg.id));
+    expect(rows1.length).toBe(1); // attempts хүснэгтэд яг нэг л мөр үүссэн
+
+    let currentAttemptId = [...firstIds][0] as string;
+    await finishAttempt(currentAttemptId);
+
+    // Үлдсэн үеүүдэд ижил зэрэгцээ хуваарийг давтаж, MAX_ATTEMPTS хүртэл зөв
+    // нэмэгдэж байгааг баталгаажуулна.
+    for (let round = 2; round <= GAME.MAX_ATTEMPTS; round++) {
+      const results = await Promise.all(
+        Array.from({ length: 10 }, () => startAttempt(reg.id)),
+      );
+      for (const r of results) expect(r.ok).toBe(true);
+
+      const ids = new Set(results.map((r) => (r.ok ? r.value.attemptId : 'FAIL')));
+      expect(ids.size).toBe(1);
+
+      const [regRow] = await db.select().from(registrations).where(eq(registrations.id, reg.id));
+      expect(regRow.attemptsUsed).toBe(round);
+
+      currentAttemptId = [...ids][0] as string;
+      await finishAttempt(currentAttemptId);
+    }
+
+    const allRows = await db.select().from(attempts).where(eq(attempts.registrationId, reg.id));
+    expect(allRows.length).toBe(GAME.MAX_ATTEMPTS); // нийт яг MAX_ATTEMPTS мөр — давхардаагүй
+
+    const extra = await startAttempt(reg.id);
+    expect(extra.ok).toBe(false);
+  });
+});
+
 describe('serveNextQuestion', () => {
   it(`${QUIZ.QUESTION_COUNT} асуулт дараалан өгнө, дараа нь null`, async () => {
     const reg = await newRegistration();

@@ -14,10 +14,13 @@ import type { Result } from '@/lib/validation';
 
 const fail = (error: string): Result<never> => ({ ok: false, error });
 
+/** `db.transaction`-ий callback-д өгөгдөх гүйлгээний бариул (tx) — db-тэй ижил query API-тай. */
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 /** 30 минутаас удсан in_progress оролдлогыг хүчингүй болгож, оролдлогын тоог буцаана. */
-async function expireStaleAttempts(registrationId: string): Promise<void> {
+async function expireStaleAttempts(tx: Tx, registrationId: string): Promise<void> {
   const cutoff = new Date(Date.now() - GAME.ATTEMPT_TIMEOUT_MS);
-  const stale = await db.update(attempts)
+  const stale = await tx.update(attempts)
     .set({ status: 'invalid', finishedAt: new Date() })
     .where(and(
       eq(attempts.registrationId, registrationId),
@@ -27,7 +30,7 @@ async function expireStaleAttempts(registrationId: string): Promise<void> {
     .returning({ id: attempts.id });
 
   if (stale.length > 0) {
-    await db.update(registrations)
+    await tx.update(registrations)
       .set({ attemptsUsed: sql`GREATEST(0, ${registrations.attemptsUsed} - ${stale.length})` })
       .where(eq(registrations.id, registrationId));
   }
@@ -39,66 +42,73 @@ export async function startAttempt(registrationId: string): Promise<Result<{
   answered: number;
   reactionDone: boolean;
 }>> {
-  await expireStaleAttempts(registrationId);
+  // Бүхэл шийдвэрийг нэг гүйлгээнд, тухайн бүртгэлийн мөрийг FOR UPDATE-ээр түгжсэн
+  // байдлаар гүйцэтгэнэ. Ингэснээр нэг тоглогчийн зэрэг ирсэн startAttempt хүсэлтүүд
+  // энэ мөр дээр дараалж, зөвхөн нэг нь шинэ оролдлого үүсгэнэ — бусад нь үүнийг
+  // үргэлжлүүлнэ. Өөр бүртгэлүүд хоорондоо түгждэггүй (зөвхөн тухайн мөрийн түгжээ).
+  return db.transaction(async (tx) => {
+    const [reg] = await tx.select().from(registrations)
+      .where(eq(registrations.id, registrationId)).for('update').limit(1);
+    if (!reg) return fail('Бүртгэл олдсонгүй');
 
-  const [reg] = await db.select().from(registrations)
-    .where(eq(registrations.id, registrationId)).limit(1);
-  if (!reg) return fail('Бүртгэл олдсонгүй');
+    await expireStaleAttempts(tx, registrationId);
 
-  // Дуусаагүй оролдлого байвал үргэлжлүүлнэ.
-  const [open] = await db.select().from(attempts)
-    .where(and(eq(attempts.registrationId, registrationId), eq(attempts.status, 'in_progress')))
-    .limit(1);
+    // expireStaleAttempts нь attemptsUsed-ийг өөрчилсөн байж болох тул дахин уншина.
+    const [freshReg] = await tx.select().from(registrations)
+      .where(eq(registrations.id, registrationId)).limit(1);
 
-  if (open) {
-    const answered = await countAnswered(open.id);
-    return {
-      ok: true,
-      value: {
-        attemptId: open.id,
-        spawnSchedule: generateSpawnSchedule(open.seed),
-        answered,
-        reactionDone: open.reactionDone,
-      },
-    };
-  }
+    // Дуусаагүй оролдлого байвал үргэлжлүүлнэ.
+    const [open] = await tx.select().from(attempts)
+      .where(and(eq(attempts.registrationId, registrationId), eq(attempts.status, 'in_progress')))
+      .limit(1);
 
-  if (reg.attemptsUsed >= GAME.MAX_ATTEMPTS) {
-    return fail(`Та ${GAME.MAX_ATTEMPTS} оролдлогоо бүрэн ашигласан байна`);
-  }
+    if (open) {
+      const answered = await countAnswered(tx, open.id);
+      return {
+        ok: true,
+        value: {
+          attemptId: open.id,
+          spawnSchedule: generateSpawnSchedule(open.seed),
+          answered,
+          reactionDone: open.reactionDone,
+        },
+      };
+    }
 
-  const pool = await db.select({ id: questions.id }).from(questions)
-    .where(eq(questions.active, true));
-  if (pool.length < QUIZ.QUESTION_COUNT) {
-    return fail('Асуултын сан хүрэлцэхгүй байна');
-  }
+    if (freshReg.attemptsUsed >= GAME.MAX_ATTEMPTS) {
+      return fail(`Та ${GAME.MAX_ATTEMPTS} оролдлогоо бүрэн ашигласан байна`);
+    }
 
-  const seed = Math.floor(Math.random() * 2_147_483_647);
-  const questionIds = pickN(pool.map((q) => q.id), QUIZ.QUESTION_COUNT, mulberry32(seed));
+    const pool = await tx.select({ id: questions.id }).from(questions)
+      .where(eq(questions.active, true));
+    if (pool.length < QUIZ.QUESTION_COUNT) {
+      return fail('Асуултын сан хүрэлцэхгүй байна');
+    }
 
-  const created = await db.transaction(async (tx) => {
-    const [row] = await tx.insert(attempts)
+    const seed = Math.floor(Math.random() * 2_147_483_647);
+    const questionIds = pickN(pool.map((q) => q.id), QUIZ.QUESTION_COUNT, mulberry32(seed));
+
+    const [created] = await tx.insert(attempts)
       .values({ registrationId, seed, questionIds })
       .returning();
     await tx.update(registrations)
       .set({ attemptsUsed: sql`${registrations.attemptsUsed} + 1` })
       .where(eq(registrations.id, registrationId));
-    return row;
-  });
 
-  return {
-    ok: true,
-    value: {
-      attemptId: created.id,
-      spawnSchedule: generateSpawnSchedule(seed),
-      answered: 0,
-      reactionDone: false,
-    },
-  };
+    return {
+      ok: true,
+      value: {
+        attemptId: created.id,
+        spawnSchedule: generateSpawnSchedule(seed),
+        answered: 0,
+        reactionDone: false,
+      },
+    };
+  });
 }
 
-async function countAnswered(attemptId: string): Promise<number> {
-  const rows = await db.select({ id: attemptAnswers.id }).from(attemptAnswers)
+async function countAnswered(tx: Tx, attemptId: string): Promise<number> {
+  const rows = await tx.select({ id: attemptAnswers.id }).from(attemptAnswers)
     .where(and(eq(attemptAnswers.attemptId, attemptId), sql`${attemptAnswers.answeredAt} IS NOT NULL`));
   return rows.length;
 }
