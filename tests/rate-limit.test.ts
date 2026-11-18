@@ -30,4 +30,14 @@ describe('clientIp', () => {
   it('header байхгүй бол unknown', () => {
     expect(clientIp(new Request('http://x'))).toBe('unknown');
   });
+
+  it('хоёул ирвэл x-real-ip-ийг ашиглана (x-forwarded-for-ийг клиент хуурамчаар солиод мултарч болохгүй)', () => {
+    const req = new Request('http://x', {
+      headers: {
+        'x-real-ip': '198.51.100.9',
+        'x-forwarded-for': '203.0.113.5, 10.0.0.1',
+      },
+    });
+    expect(clientIp(req)).toBe('198.51.100.9');
+  });
 });
