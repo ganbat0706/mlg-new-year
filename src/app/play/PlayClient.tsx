@@ -6,6 +6,7 @@ import { apiPost } from '@/lib/api';
 import { loadSession } from '@/lib/session';
 import { Button } from '@/components/Button';
 import { QuizStage } from './QuizStage';
+import { ReactionStage } from './ReactionStage';
 import type { SpawnItem } from '@/lib/reaction';
 
 type StartData = {
@@ -91,6 +92,16 @@ export function PlayClient() {
     );
   }
 
-  // 'reaction' үе Task 13-т нэмэгдэнэ.
-  return <p className="py-24 text-center text-[#6B6568]">Ачаа ачих тоглоом бэлдэж байна…</p>;
+  return (
+    <ReactionStage
+      attemptId={start.attemptId}
+      schedule={start.spawnSchedule}
+      onDone={async () => {
+        const res = await apiPost<unknown>(`/api/attempt/${start.attemptId}/finish`, {});
+        if (!res.ok) { setError(res.error); setStage('error'); return; }
+        router.push('/result');
+      }}
+      onError={(m) => { setError(m); setStage('error'); }}
+    />
+  );
 }
