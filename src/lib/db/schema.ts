@@ -31,9 +31,20 @@ export const attempts = pgTable('attempts', {
   seed: integer('seed').notNull(),
   questionIds: jsonb('question_ids').$type<number[]>().notNull(),
   quizScore: integer('quiz_score').notNull().default(0),
+  // Phase 2-т хасагдах reaction тоглоом — зарим файл хараахан шилжээгүй (P2-3-т хасна).
   reactionScore: integer('reaction_score').notNull().default(0),
-  totalScore: integer('total_score').notNull().default(0),
   reactionDone: boolean('reaction_done').notNull().default(false),
+  // Phase 2 — гурван шинэ тоглоом (P2-1).
+  sortScore: integer('sort_score').notNull().default(0),
+  stackScore: integer('stack_score').notNull().default(0),
+  memoScore: integer('memo_score').notNull().default(0),
+  sortDone: boolean('sort_done').notNull().default(false),
+  stackDone: boolean('stack_done').notNull().default(false),
+  memoDone: boolean('memo_done').notNull().default(false),
+  /** Сэжигтэй оролдлого — min event gap зөрчсөн эсвэл memo-г алдаагүй дуусгасан. Шагнахын өмнө админ шалгана. */
+  flagged: boolean('flagged').notNull().default(false),
+  flagReason: text('flag_reason'),
+  totalScore: integer('total_score').notNull().default(0),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp('finished_at', { withTimezone: true }),
 }, (t) => [index('attempts_registration_idx').on(t.registrationId)]);

@@ -7,6 +7,11 @@ export const QUIZ = {
   SPEED_POINTS_PER_SECOND: 10,
 } as const;
 
+/**
+ * Reaction тоглоом — Phase 2-т SORT/STACK/MEMO-оор солигдоно (P2-3).
+ * Одоогоор зарим файл (reaction.ts, ReactionStage.tsx, reaction route,
+ * submitReaction, reaction тестүүд) үүнээс хамааралтай тул хасаагүй.
+ */
 export const REACTION = {
   DURATION_MS: 20_000,
   OBJECT_LIFETIME_MS: 1_200,
@@ -17,6 +22,44 @@ export const REACTION = {
   /** Нэг хүсэлтэд зөвшөөрөх дээд tap тоо — илүү бол 400. */
   MAX_TAPS: 400,
   /** Tap-ын цагт зөвшөөрөх хөнгөлөлт. */
+  GRACE_MS: 400,
+} as const;
+
+/** 1. Зөв зам — контейнер зөв чиглэлд ангилах тоглоом. Дээд оноо: 12 × 80 = 960. */
+export const SORT = {
+  DURATION_MS: 15_000,
+  ITEM_COUNT: 12,
+  DAMAGED_RATIO: 0.2,
+  CORRECT_POINTS: 80,
+  WRONG_POINTS: -40,
+} as const;
+
+/** 2. Контейнер овоолох — цаг хугацааны нарийвчлалын тоглоом. Дээд оноо: 6 × (100 + 60) = 960. */
+export const STACK = {
+  DURATION_MS: 10_000,
+  LEVELS: 6,
+  DROP_MS: 500,
+  BASE_PERIOD_MS: 1_600,
+  PERIOD_STEP_MS: 60,
+  TOLERANCE_PCT: 12,
+  BASE_POINTS: 100,
+  PRECISION_POINTS: 60,
+} as const;
+
+/** 3. Хос манифест — санах ойн тоглоом. Дээд оноо: 6 × 130 + 180 = 960. */
+export const MEMO = {
+  DURATION_MS: 20_000,
+  PAIRS: 6,
+  LOCK_MS: 600,
+  PAIR_POINTS: 130,
+  BONUS_PER_SEC: 30,
+  BONUS_MAX: 180,
+} as const;
+
+/** Бүх тоглоомд нийтлэг — хүний хуруу үүнээс хурдан дарж чадахгүй. */
+export const PLAY = {
+  MIN_EVENT_GAP_MS: 200,
+  MAX_EVENTS: 400,
   GRACE_MS: 400,
 } as const;
 
