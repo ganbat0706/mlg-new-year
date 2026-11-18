@@ -13,8 +13,8 @@ export function signAdminToken(): string {
   return createHmac('sha256', secret()).update('mlg-admin-v1').digest('hex');
 }
 
-export function verifyAdminToken(token: string | undefined): boolean {
-  if (!token) return false;
+export function verifyAdminToken(token: unknown): boolean {
+  if (typeof token !== 'string' || token.length === 0) return false;
   let expected: string;
   try { expected = signAdminToken(); } catch { return false; }
 
@@ -24,11 +24,13 @@ export function verifyAdminToken(token: string | undefined): boolean {
   return timingSafeEqual(a, b);
 }
 
-export function checkPassword(input: string): boolean {
+export function checkPassword(input: unknown): boolean {
+  if (typeof input !== 'string') return false;
+
   let pw: string;
   try { pw = secret(); } catch { return false; }
 
-  const a = Buffer.from(input ?? '');
+  const a = Buffer.from(input);
   const b = Buffer.from(pw);
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);

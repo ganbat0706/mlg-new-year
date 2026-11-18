@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { signAdminToken, verifyAdminToken } from '@/lib/admin-auth';
+import { signAdminToken, verifyAdminToken, checkPassword } from '@/lib/admin-auth';
 
 beforeEach(() => { process.env.ADMIN_PASSWORD = 'нууц-үг-123'; });
 
@@ -27,5 +27,33 @@ describe('admin token', () => {
   it('ADMIN_PASSWORD тохируулаагүй бол алдаа шиднэ', () => {
     delete process.env.ADMIN_PASSWORD;
     expect(() => signAdminToken()).toThrow();
+  });
+
+  it('string бус token-ыг шидэлгүйгээр татгалзана', () => {
+    expect(verifyAdminToken(12345)).toBe(false);
+    expect(verifyAdminToken(true)).toBe(false);
+    expect(verifyAdminToken({ a: 1 })).toBe(false);
+    expect(verifyAdminToken(['x'])).toBe(false);
+    expect(verifyAdminToken(null)).toBe(false);
+    expect(verifyAdminToken(undefined)).toBe(false);
+  });
+});
+
+describe('checkPassword', () => {
+  it('зөв нууц үгийг зөвшөөрнө', () => {
+    expect(checkPassword('нууц-үг-123')).toBe(true);
+  });
+
+  it('буруу нууц үгийг татгалзана', () => {
+    expect(checkPassword('буруу')).toBe(false);
+  });
+
+  it('string бус утгыг шидэлгүйгээр татгалзана', () => {
+    expect(checkPassword(12345)).toBe(false);
+    expect(checkPassword(true)).toBe(false);
+    expect(checkPassword({ a: 1 })).toBe(false);
+    expect(checkPassword(['x'])).toBe(false);
+    expect(checkPassword(null)).toBe(false);
+    expect(checkPassword(undefined)).toBe(false);
   });
 });
