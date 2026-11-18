@@ -24,11 +24,16 @@ export function QuizStage({ attemptId, onDone, onError }: Props) {
   const [locked, setLocked] = useState(false);
   const [feedback, setFeedback] = useState<{ correct: boolean; points: number } | null>(null);
   const deadlineRef = useRef(0);
+  // Давхар товшилтыг бодитоор хориглох түгжээ — "locked" state нь зөвхөн харагдах
+  // байдал (disabled товч) бөгөөд commit хийгдэхээс өмнө хуучин утгыг уншиж болзошгүй
+  // тул синхрон шалгалт хийхэд тохирохгүй. Ref нь энэ хоёрдугаар товшилтыг хаана.
+  const answeringRef = useRef(false);
 
   const loadNext = useCallback(async () => {
     const res = await apiGet<Question | null>(`/api/attempt/${attemptId}/question`);
     if (!res.ok) { onError(res.error); return; }
 
+    answeringRef.current = false;
     setFeedback(null);
     setLocked(false);
 
@@ -40,7 +45,8 @@ export function QuizStage({ attemptId, onDone, onError }: Props) {
   }, [attemptId, onDone, onError]);
 
   const answer = useCallback(async (shownIndex: number) => {
-    if (locked || !question) return;
+    if (answeringRef.current || !question) return;
+    answeringRef.current = true;
     setLocked(true);
 
     const res = await apiPost<{ isCorrect: boolean; points: number }>(
@@ -49,14 +55,18 @@ export function QuizStage({ attemptId, onDone, onError }: Props) {
     );
 
     if (!res.ok) {
-      // Хугацаа дууссаны улмаас сервер татгалзсан бол дараагийн асуулт руу.
-      setFeedback({ correct: false, points: 0 });
-    } else {
-      setFeedback({ correct: res.data.isCorrect, points: res.data.points });
+      // Сервер татгалзсан — сүлжээ тасарсан эсвэл асуулт аль хэдийн хариулагдсан
+      // (давхар бичлэгийн зэрэгцээ хүсэлтийн тохиолдол) байж болно. Аль ч тохиолдолд
+      // тоглогч зөв хариулсан эсэхийг бид мэдэхгүй тул «Буруу» гэж буруу мэдээлэхгүй —
+      // feedback үзүүлэхгүйгээр шууд дараагийн (эсвэл ижил, хариулаагүй хэвээр байгаа)
+      // асуулт руу шилжинэ.
+      void loadNext();
+      return;
     }
 
+    setFeedback({ correct: res.data.isCorrect, points: res.data.points });
     setTimeout(() => { void loadNext(); }, 900);
-  }, [attemptId, locked, loadNext, question]);
+  }, [attemptId, loadNext, question]);
 
   useEffect(() => {
     const t = setTimeout(() => { void loadNext(); }, 0);
