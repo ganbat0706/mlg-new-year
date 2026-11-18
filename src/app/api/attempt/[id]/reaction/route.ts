@@ -3,6 +3,9 @@ import { REACTION } from '@/lib/config';
 import { ok, bad, boom, readJson } from '@/lib/http';
 import type { Tap } from '@/lib/reaction';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   req: Request,
   ctx: { params: Promise<{ id: string }> },

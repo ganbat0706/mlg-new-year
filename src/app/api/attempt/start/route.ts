@@ -2,6 +2,9 @@ import { startAttempt } from '@/lib/repo/attempts';
 import { isGameOpen } from '@/lib/config';
 import { ok, bad, closed, boom, readJson } from '@/lib/http';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request): Promise<Response> {
   if (!isGameOpen()) return closed();
 

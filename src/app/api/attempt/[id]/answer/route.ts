@@ -1,6 +1,9 @@
 import { submitAnswer } from '@/lib/repo/attempts';
 import { ok, bad, boom, readJson } from '@/lib/http';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 type Body = { questionId?: number; choiceIndex?: number };
 
 export async function POST(

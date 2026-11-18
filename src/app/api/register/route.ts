@@ -3,6 +3,9 @@ import { isGameOpen } from '@/lib/config';
 import { ok, bad, closed, boom, readJson } from '@/lib/http';
 import { hitRateLimit, clientIp } from '@/lib/rate-limit';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 type Body = {
   lastName?: string; firstName?: string; department?: string; phone?: string;
 };

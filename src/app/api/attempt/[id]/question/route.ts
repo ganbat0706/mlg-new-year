@@ -1,6 +1,9 @@
 import { serveNextQuestion } from '@/lib/repo/attempts';
 import { ok, bad, boom } from '@/lib/http';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   _req: Request,
   ctx: { params: Promise<{ id: string }> },
