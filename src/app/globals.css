@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand: #ED1C24;
+  --color-ink: #221E20;
+  --color-paper: #FAF7F0;
+  --color-muted: #6B6568;
+}
+
+html, body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Тоглоом дээр санамсаргүй сонголт хийхээс сэргийлнэ. */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
