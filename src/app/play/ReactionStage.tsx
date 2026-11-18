@@ -23,6 +23,16 @@ export function ReactionStage({ attemptId, schedule, onDone, onError }: Props) {
 
   const startedAtRef = useRef(0);
   const tapsRef = useRef<Tap[]>([]);
+  // Серверийн scoreTaps() нийт нийлбэрийг ЗӨВХӨН нэг удаа, эцэст нь 0-ээс доош
+  // буулгадаг (src/lib/reaction.ts:85). Харагдах оноог tap тутамд (0, ...)-оор
+  // хавчвал дэлгэц дээрх тоо серверийн тооноос зөрнө — жишээ нь хар, хар, улаан
+  // дарвал клиент 40, сервер 0 харуулна. Иймд түүхий (clamp хийгээгүй) нийлбэрийг
+  // энд хадгалж, зөвхөн ХАРУУЛАХ үедээ нэг удаа 0-ээс доош буулгана.
+  const rawScoreRef = useRef(0);
+  // tappedIds state нь зөвхөн аль объект render хийгдэхээ больсоныг шийднэ.
+  // Давхар tap-аас бодитоор хамгаалахын тулд энэ ref-ийг синхрон шалгаж, синхрон
+  // шинэчилнэ — state нь commit хийгдэхээс өмнө хуучин утгыг уншуулж болзошгүй.
+  const tappedIdsRef = useRef<Set<number>>(new Set());
 
   const submit = useCallback(async () => {
     setPhase('sending');
@@ -53,6 +63,8 @@ export function ReactionStage({ attemptId, schedule, onDone, onError }: Props) {
   function begin() {
     startedAtRef.current = Date.now();
     tapsRef.current = [];
+    rawScoreRef.current = 0;
+    tappedIdsRef.current = new Set();
     setTappedIds(new Set());
     setShownScore(0);
     setElapsed(0);
@@ -102,15 +114,17 @@ export function ReactionStage({ attemptId, schedule, onDone, onError }: Props) {
             type="button"
             aria-label={item.kind === 'good' ? 'Контейнер ачих' : 'Эвдэрсэн ачаа'}
             onPointerDown={() => {
-              if (phase !== 'running' || tappedIds.has(item.id)) return;
+              if (phase !== 'running' || tappedIdsRef.current.has(item.id)) return;
 
               const t = Date.now() - startedAtRef.current;
               if (tapsRef.current.length >= REACTION.MAX_TAPS) return;
 
+              tappedIdsRef.current.add(item.id);
               tapsRef.current.push({ id: item.id, t });
               setTappedIds((prev) => new Set(prev).add(item.id));
-              setShownScore((s) => Math.max(0, s + (item.kind === 'good'
-                ? REACTION.GOOD_POINTS : REACTION.BAD_POINTS)));
+              rawScoreRef.current += item.kind === 'good'
+                ? REACTION.GOOD_POINTS : REACTION.BAD_POINTS;
+              setShownScore(Math.max(0, rawScoreRef.current));
             }}
             className="absolute rounded-md"
             style={{
