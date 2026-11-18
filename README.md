@@ -1,54 +1,259 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MLG Шинэ жилийн урилгын тоглоом
 
-## Getting Started
+Monlogistics Group-ийн 2026 оны шинэ жилийн арга хэмжээний урилгыг
+тоглоомоор дамжуулан олгох веб (Next.js, App Router).
 
-First, run the development server:
+Ажилтан өөрийн нэр/утасны дугаараар бүртгүүлж, 10 асуулттай мэдлэгийн
+quiz болон reaction (хурдан товших) тоглоом тоглоод, авсан онооноосоо
+хамаарч хувийн урилгын зураг (PNG) татаж авна. `/admin` хуудаснаас
+бүх бүртгэлийг CSV-ээр татаж болно.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Ажиллуулах
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Database setup
-
-Start the local Postgres container, then push the schema and provision the
-auxiliary objects (idempotent — safe to re-run on a fresh volume or CI):
+Дараах дарааллыг чанд баримтална — эрэмбэ чухал (жишээ нь `db:setup`-г
+`db:push`-ийн дараа, `seed`-ийг түүнээс ч дараа ажиллуулна):
 
 ```bash
 cp .env.example .env.local
 docker compose up -d
+npm install
+npm run fonts
 npm run db:push
 npm run db:setup
-npm run seed   # (дараагийн task-ууд асуулт/урилгын тоглоомын өгөгдлийг нэмэх үед)
+npm run seed
+npm run dev
 ```
 
-`npm run db:setup` runs `scripts/db-setup.ts`, which creates the
-`invite_seq_counter` sequence used by the invitation-code generator
-(`CREATE SEQUENCE IF NOT EXISTS invite_seq_counter START 1;`) — it no longer
-needs to be created by hand via `docker compose exec db psql`.
+- `npm run fonts` — `src/assets/fonts`-д DejaVu Sans фонтыг татаж авчирна
+  (эдгээр файлууд **repo-д commit хийгдсэн** тул анх удаа clone хийгээд
+  шууд ажиллуулж болно; дахин татах шаардлагагүй, доорх "Фонтыг яагаад
+  commit хийсэн бэ" хэсгийг үзнэ үү).
+- `npm run db:setup` — **шинэ (хоосон) өгөгдлийн сан болгонд заавал**
+  ажиллуулах ёстой. `scripts/db-setup.ts`-г дуудаж:
+  - `invite_seq_counter` sequence (урилгын дугаар үүсгэгч) үүсгэнэ;
+  - зэрэгцээ (concurrency) асуудлаас хамгаалах 3 unique индекс үүсгэнэ
+    (нэг бүртгэлд зэрэг нэгээс олон "in_progress" оролдлого үүсэхээс,
+    мөн нэг оролдлогод давхар асуулт/байрлал үүсэхээс хамгаална).
 
-## Learn More
+  Бүгд idempotent (`IF NOT EXISTS`) тул дахин ажиллуулахад аюулгүй.
+- `npm run seed` — асуултын сан (`src/data/questions.ts`)-г `questions`
+  хүснэгтэд ачаална.
 
-To learn more about Next.js, take a look at the following resources:
+## Тест
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm test          # vitest, нэг удаа ажиллана
+npm run test:watch
+npx tsc --noEmit  # type шалгалт
+npm run lint
+npm run build     # production build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Эдгээр дөрвөн командыг deploy хийхийн өмнө үргэлж цэвэр (алдаагүй) байлгана.
 
-## Deploy on Vercel
+## Тохируулга
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Тоглоомын бараг бүх тогтмол утга нэг файлд `src/lib/config.ts` дотор
+төвлөрсөн байдаг — оноо, хугацаа, оролдлогын тоо гэх мэтийг өөрчлөхдөө
+зөвхөн энэ файлыг засна:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `QUIZ.*` — асуултын тоо, хариулах хугацаа, суурь болон хурдны оноо.
+- `REACTION.*` — reaction тоглоомын үргэлжлэх хугацаа, объект гарч ирэх
+  давтамж, оноо. **`REACTION.SPAWN_INTERVAL_MS` нь reaction ононы дээд
+  хязгаарыг (max score) шууд тодорхойлдог** — утга бага байх тусам
+  нэгж хугацаанд илүү олон объект гарч ирнэ, тэр тусам дээд оноо
+  өндөр болно. Одоогийн тохиргоогоор (300ms) онооны дээд хязгаар
+  орчин ~1,880 байна. Онооны тэнцвэрийг өөрчлөхдөө энэ утгыг болон
+  `QUIZ.SPEED_POINTS_PER_SECOND`-ийг хамт тохируулж, `tests/reaction.test.ts`-д
+  байгаа `maxReactionScore()`-той тестээр баталгаажуулна уу.
+- `GAME.*` — оролдлогын дээд тоо (`MAX_ATTEMPTS`), шагналт байрын тоо
+  (`PRIZE_PLACES`), урилгын кодын угтвар (`INVITE_PREFIX`).
+
+## Урилгын дизайныг хэрхэн солих вэ
+
+Урилгын PNG зургийг зөвхөн нэг файл үүсгэдэг:
+**`src/app/invite/[code]/image/route.tsx`**. Дизайн (өнгө, байршил,
+фонт хэмжээ, logo гэх мэт) бүгд энэ файлын JSX болон дээд хэсгийн
+тогтмолуудад (`W`, `H`, `RED`, `INK`, `PAPER`, `MUTED`, `VENUE_WIDTH`)
+байрладаг. Өөр файл засах шаардлагагүй.
+
+## Чухал — бодож ажилласан 3 шийдвэр
+
+### 1. Урилгын кодонд цоорхой (gap) гарна — энэ нь согог биш
+
+Урилгын код `invite_seq_counter` нэртэй Postgres sequence-ээс гардаг.
+Postgres sequence нь **транзакцаас үл хамааран** (non-transactional)
+ажилладаг тул хэрэв нэг хүсэлт `nextval()`-аар дугаар аваад, дараа нь
+ямар нэг шалтгаанаар (жишээ нь товчийг хоёр дахин дараад мөн хугацаанд
+нэг дугаарт хоёр хүсэлт мөргөлдөөд, хоёр дахь нь rollback хийгдэх мэт)
+бодит бүртгэл үүсгэж чадахгүй бол, тухайн дугаар **бусдад олгогдохгүй,
+бүрмөсөн алга болно**.
+
+Жишээ нь: `MLG-202602`-с `MLG-202605` хүртэлх дугаарууд алгасагдаад,
+дараагийн хүн шууд `MLG-202606` авч болно. Энэ бол хэвийн, баримтжуулсан
+зан төлөв — **өвөрмөц байдал (uniqueness) алдагдахгүй**, бидэнд хаалган
+дээр хамгийн чухал зүйл бол энэ. Ачааллын шалгалтын явцад (доороос
+үзнэ үү) яг энэ зан төлөв бодитоор ажиглагдсан.
+
+**Арга хэмжээний баг үүнийг "систем хүн алдсан" гэж ойлгож болохгүй.**
+Нийт хэдэн хүн ирэхийг тоолохдоо хамгийн том кодын дугаараар БИШ,
+харин `/admin` хуудасны бүртгэлийн тоогоор (CSV мөрийн тоо) тооцоол.
+
+### 2. `EVENT_VENUE`-ийн урт хязгаартай — ойролцоогоор 60 тэмдэгт
+
+Урилгын PNG дээр байршлын (venue) текст **хамгийн ихдээ 2 мөрөнд**
+шахагддаг (`src/app/invite/[code]/image/route.tsx`-ийн `venueFontSize`
+болон 2-мөрийн `maxHeight` хязгаар) — үүнээс урт бол **тасарч алга
+болно**. Шалгахад 120 тэмдэгт орчим бүхий хаягийн сүүлийн хэсэг
+(яг л зочид буудал дотор аль танхим гэдгийг зааж буй, зочдод хамгийн
+хэрэгтэй мэдээлэл) тасарч байсан.
+
+- ✅ **Сайн жишээ** (~37 тэмдэгт): `Шангри-Ла зочид буудал, Гранд Болрүм`
+- ❌ **Муу жишээ**: бүтэн хаягийн маягийн урт текст, жишээ нь
+  `Улаанбаатар хот, Сүхбаатар дүүрэг, 1-р хороо, Чингисийн өргөн чөлөө,
+  Шангри-Ла зочид буудал, Гранд Болрүм танхим` (85+ тэмдэгт) — ийм урт
+  хаягийн чухал сүүлч хэсэг (танхимын нэр) тасрах магадлалтай.
+
+`EVENT_VENUE`-г бөглөхдөө **зочид буудлын нэр + танхимын нэр** хоёрыг л
+бич, бүтэн гудамжны хаяг бичихгүй байхыг зөвлөж байна. ~60 тэмдэгтээс
+хэтрэхгүй байхыг зорь.
+
+### 3. 3 асуулт одоогоор бөглөгдөөгүй
+
+`src/data/questions.ts` дотор дараах 3 асуулт `[БӨГЛӨХ]` тэмдэгтэй:
+
+- Monlogistics Group хэдэн онд байгуулагдсан бэ?
+- Monlogistics Group хэдэн салбартай вэ?
+- Компанийн уриа үг аль нь вэ?
+
+Эдгээрийг **арга хэмжээнээс өмнө заавал бодит хариулт, сонголтуудаар
+бөглөнө**. `npm test` ажиллуулахад `tests/questions-data.test.ts`
+бөглөгдөөгүй асуулт үлдсэн тоог console.warn-ээр сануулдаг (тест
+унахгүй, зөвхөн сануулга) — 0 болтол арга хэмжээг эхлүүлэхгүй.
+
+## Ачааллын шалгалт
+
+`scripts/load-test.mjs` нь 200 ажилтан нэг зэрэг бүртгүүлэхийг
+дуурайна (`/api/register`-д 200 зэрэг POST хүсэлт зэрэг явуулж, бүгд
+өөр нэр/утас/IP-тэй):
+
+```bash
+node scripts/load-test.mjs http://localhost:3000
+```
+
+Ажиллуулахаас өмнө болон дараа DB-г цэвэрлэ:
+
+```bash
+docker compose exec -T db psql -U mlg -d mlg \
+  -c "TRUNCATE attempt_answers, attempts, registrations CASCADE; ALTER SEQUENCE invite_seq_counter RESTART WITH 1;"
+```
+
+Жинхэнэ ажиллуулалтын үр дүн (2026-11-19, `npm run dev`, localhost):
+
+```
+Хугацаа:       797 ms
+Амжилттай:     200 / 200
+Өвөрмөц код:   200
+✓ Бүх код өвөрмөц
+```
+
+**Анхаар:** энэ бол `next dev` сервер дээрх хэмжилт — production build
+(`next build` + `next start`, эсвэл Vercel) үүнээс хурдан байх ёстой.
+Мөн `/api/register`-ийн rate limit (`src/lib/rate-limit.ts`) нэг IP-д
+минутад 60 хүсэлт зөвшөөрдөг тул скрипт нь хүсэлт бүрт өөр
+`X-Forwarded-For` толгой тавьж 200 өөр "ажилтан" өөр сүлжээнээс ирж
+буйг дуурайдаг (бодит event дээр ч ажилтнууд өөр өөр утас/wifi-гаас
+бүртгүүлнэ) — эс тэгвээс бүх хүсэлт нэг л IP (`unknown`) болж,
+140 нь 429-р татгалзагдана.
+
+## Арга хэмжээнээс өмнө заавал хийх — шалгах хуудас
+
+- [ ] **`ADMIN_PASSWORD`-ыг хүчтэй нууц үгээр сол.** Одоогоор
+  `.env.example`-д `change-me` гэсэн түр нууц үгтэй. `/admin` хуудас
+  нь **бүх ажилтны овог, нэр, хэлтэс, бас УТАСНЫ ДУГААР**-ыг нэг
+  дор харуулдаг — хэрэв production дээр `ADMIN_PASSWORD` энэ
+  байдлаараа үлдвэл, нууц үгийг таамагласан ХЭН Ч компанийн бүх
+  ажилтны утасны дугаар бүхий жагсаалтыг унших боломжтой болно.
+  Энэ нь жагсаалтын хамгийн эхний, хамгийн чухал зүйл.
+- [ ] `src/data/questions.ts` — 3 `[БӨГЛӨХ]` асуулт бөглөгдсөн.
+- [ ] `src/lib/departments.ts` — хэлтсийн жагсаалт бодит бүтэцтэй тохирсон.
+- [ ] `EVENT_TIME`, `EVENT_VENUE` production дээр тохируулагдсан
+  (venue ~60 тэмдэгтээс хэтрэхгүй — дээрх "Чухал шийдвэр 2"-г үз).
+- [ ] `GAME_CLOSES_AT` = `2026-12-03T23:59:59+08:00` production дээр
+  тохируулагдсан.
+- [ ] Урилгын дизайн эцсийн байдлаар сонгогдож,
+  `src/app/invite/[code]/image/route.tsx`-д хэрэгжсэн.
+- [ ] Ачааллын шалгалт (`scripts/load-test.mjs`) production дээр нэг
+  удаа ажиллаж, дараа нь тестийн бүртгэлүүд устгагдаж, sequence 1-ээс
+  дахин эхэлсэн.
+- [ ] iPhone Safari болон Android Chrome дээр бүтэн урсгал (бүртгэл →
+  дүрэм → quiz → reaction → үр дүн → урилга татах) гараар шалгагдсан.
+
+## Production руу deploy хийх (гараар хийх дараалал)
+
+Дараах алхмууд Vercel болон өгөгдлийн сангийн эзэмшигчийн эрх шаарддаг
+тул гараар, эзэн өөрөө гүйцэтгэнэ:
+
+1. **Vercel төслийг холбох:**
+
+   ```bash
+   npx vercel link
+   ```
+
+2. **Орчны хувьсагчдыг нэмэх** (`production` орчинд):
+
+   ```bash
+   npx vercel env add DATABASE_URL production
+   npx vercel env add GAME_CLOSES_AT production
+   npx vercel env add EVENT_DATE production
+   npx vercel env add EVENT_TIME production
+   npx vercel env add EVENT_VENUE production
+   npx vercel env add ADMIN_PASSWORD production
+   ```
+
+   `DATABASE_URL` — Vercel Postgres эсвэл Neon-ийн **pooled** холболтын
+   мөр байх ёстой. `ADMIN_PASSWORD`-д дээрх шалгах хуудасны анхааруулгыг
+   үзнэ үү — `change-me`-гээр production руу бүү гарга.
+
+3. **Схем болон анхдагч объектуудыг production DB-д түлхэх:**
+
+   ```bash
+   DATABASE_URL="<production-url>" npm run db:push
+   DATABASE_URL="<production-url>" npm run db:setup
+   DATABASE_URL="<production-url>" npm run seed
+   ```
+
+   `db:setup`-ийг заавал ажиллуул — шинэ DB дээр `invite_seq_counter`
+   болон concurrency-хамгаалах индексүүдгүй бол бүртгэл API 500 өгнө.
+
+4. **Deploy:**
+
+   ```bash
+   npx vercel --prod
+   ```
+
+5. **Production дээр бодит утаснаас бүтэн урсгалыг шалгах** (iPhone
+   Safari, Android Chrome):
+   - Бүртгэл → дүрэм → quiz → reaction → үр дүн → урилга татах.
+   - Татсан PNG дээр кирилл үсэг, нэр, дугаар зөв харагдаж байгааг шалгах.
+   - `/admin`-д нэвтэрч CSV татаж шалгах.
+   - (Сонголт) `node scripts/load-test.mjs https://<production-url>`
+     ажиллуулж ачааллыг нэг удаа шалгах.
+   - Дээрх бүх тестийн бүртгэлийг устгаж, sequence-ийг 1-ээс эхлүүлэх:
+
+     ```bash
+     psql "<production-url>" -c "TRUNCATE attempt_answers, attempts, registrations CASCADE; ALTER SEQUENCE invite_seq_counter RESTART WITH 1;"
+     ```
+
+## Фонтыг яагаад commit хийсэн бэ
+
+`src/assets/fonts/DejaVuSans-Regular.ttf` болон `DejaVuSans-Bold.ttf`
+(нийт ~1.4 MB) нь **зориудаар git-д commit хийгдсэн**, `.gitignore`-д
+орохгүй. Хэрэв эдгээрийг build бүрт гадны CDN-ээс (жишээ нь
+`cdn.jsdelivr.net`) татдаг байсан бол, тэр CDN яг deploy хийх мөчид
+унтарсан/удаашруулсан тохиолдолд build нь **хамгийн буруу цагт** (event-ийн
+өмнөх сүүлийн deploy үед) алдаатай унах эрсдэлтэй. Build гуравдагч
+талын URL тогтвортой ажиллахаас хамаардаг байх ёсгүй тул фонтыг repo
+дотор commit хийж, энэ эрсдэлийг бүрмөсөн арилгасан. Шинэ фонт хэрэгтэй бол
+`npm run fonts` (`scripts/fetch-fonts.mjs`) ажиллуулж дахин татаад,
+файлуудыг дахин commit хийнэ.
