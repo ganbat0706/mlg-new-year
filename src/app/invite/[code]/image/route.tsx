@@ -14,21 +14,38 @@ export const dynamic = 'force-dynamic';
 
 const W = 1080;
 const H = 1350;
-const RED = '#ED1C24';
-const INK = '#221E20';
-const PAPER = '#FAF7F0';
-const MUTED = '#6B6568';
 
 /**
- * Урилга "А · Ачааны баримт" (waybill) чиглэл — зочин бол хүлээн авагч, баярын
- * зочлол бол ачаа. Манифестийн хүснэгт доторх БАЙРШИЛ баганад тогтмол px
- * өргөн заавал өгөх ёстой: Satori/Yoga flexGrow+minWidth:0 хослол энд текстийг
- * зөв биелдэггүй болох нь өмнөх (загвар загварын) хувилбар дээр бодит зураг
- * үзээд илэрсэн асуудал — 85 тэмдэгттэй хаяг ДУГААРыг 1080px canvas-аас ч
- * гадагшлуулж байв. ДУГААР үргэлж БАЙРШИЛ-ийн доор, хүснэгтийн тусдаа мөрөнд,
- * өөрийн баталгаатай зайтайгаар байрлана — БАЙРШИЛ хэзээ ч түүнийг шахахгүй.
+ * Урилга «C · ЧИНГЭЛЭГ» чиглэл (Fable-ийн гурван саналаас хэрэглэгч сонгов).
+ * Бүх хуудас нь брэндийн улаан чингэлэгийн хаалга: хажуугийн атираа, хоёр
+ * талын цоожны хошуу, дээвэр дээрх цас, стенсил бичиглэл. Урилгын код нь
+ * чингэлэгийн дугаарын байрлалд сууна.
+ *
+ * Бүрэн дүүрэн улаан дэвсгэр тул ЖИЖИГ бичвэр бүр заавал хар (INK) эсвэл
+ * цагаан (WHITE) ялтас дээр суух ёстой — цагаан бичвэр #ED1C24 дээр ердөө
+ * 4.38:1 контрасттай, энэ нь зөвхөн ТОМ бичвэрт (≥24px энгийн, ≥19px bold)
+ * WCAG AA-д тэнцдэг. Тиймээс 18px шошго бүр ялтас дээр байрлав.
  */
-const VENUE_WIDTH = 874;
+const RED = '#ED1C24';
+const RIB_DARK = '#C8131A';
+const RIB_LIGHT = '#F6555B';
+const INK = '#221E20';
+const WHITE = '#FFFFFF';
+const ROD_EDGE = '#171415';
+const ROD_FACE = '#3E3739';
+const INK_LABEL = '#B5AFB1';
+const PLATE_LABEL = '#6B6568';
+const PLATE_DOT = '#C9C2C4';
+const INK_DOT = '#6B6568';
+
+/** Өгөгдлийн ялтас доторх БАЙРШИЛ баганын тогтмол өргөн (px). */
+const VENUE_WIDTH = 414;
+/**
+ * БАЙРШИЛ-ын талбарын тогтмол өндөр. Ялтасны өндөр эндээс тодорхойлогддог тул
+ * фонт багасахад мөрийн тоо нэмэгддэг ч ялтас ӨСӨХГҮЙ — доорх ДУГААРын ялтас
+ * хэзээ ч доошоо түлхэгдэхгүй.
+ */
+const VENUE_BOX_HEIGHT = 96;
 
 /**
  * Анх Noto Sans-ийг subset (latin/cyrillic) тус бүрээр дөрвөн файлаар fallback
@@ -59,43 +76,64 @@ async function loadLogo(origin: string): Promise<string> {
   return `data:image/png;base64,${buf.toString('base64')}`;
 }
 
-/** Урт нэр манифестийн мөрнөөс халиахгүйн тулд урт нь нэмэгдэх тусам фонтыг багасгана. */
+/**
+ * Эзэмшигчийн нэр 860px контентын өргөнөөс халиж 2 дахь мөр рүү шилжвэл доорх
+ * ялтаснууд доошоо түлхэгдэнэ. Урт нь нэмэгдэх тусам фонтыг багасгаж нэг мөрөнд
+ * багтаана.
+ */
 function nameFontSize(fullName: string): number {
   const len = fullName.length;
-  if (len <= 14) return 58;
-  if (len <= 20) return 48;
-  if (len <= 28) return 40;
+  if (len <= 14) return 60;
+  if (len <= 20) return 52;
+  if (len <= 28) return 42;
   if (len <= 36) return 34;
-  return 28;
-}
-
-/** Тасалбар (tear-off stub) дэх нэрийн давталт — нэг мөрөнд багтаах тул арай жижиг. */
-function stubNameFontSize(fullName: string): number {
-  const len = fullName.length;
-  if (len <= 16) return 24;
-  if (len <= 26) return 20;
-  if (len <= 36) return 17;
-  return 14;
+  return 26;
 }
 
 /**
- * Байршлын талбар бол event.venue гэдэг нь арга хэмжээний баг гараар бөглөх
- * чөлөөт текст — урт нь урьдчилан мэдэгдэхгүй. Урт нь нэмэгдэх тусам фонтыг
- * багасгаж, доод талд 2 мөрөөр хязгаарлан хэтэрсэн хэсгийг тасална
- * (venueMaxHeight-той хамт). Босго утгуудыг богино, ~85 тэмдэгтийн бодит
- * Монгол хаяг, 200 тэмдэгтийн туйлшруулсан тохиолдол гэсэн гурван тохиолдол
- * дээр бодит зураг үүсгэж харж тохируулсан — таамаглаагүй.
+ * БАЙРШИЛ бол арга хэмжээний баг гараар бөглөх чөлөөт текст — урт нь урьдчилан
+ * мэдэгдэхгүй.
+ *
+ * Босгуудыг ТААМАГЛААГҮЙ: 414px багананд DejaVu Sans Bold-оор бодит зураг
+ * үүсгэж хэмжсэнээр нэг мөрөнд ≈ 609/фонт тэмдэгт багтдаг нь гарсан
+ * (16px дээр 38 тэмдэгт/мөр × 3 мөр = 114 гэж хэмжигдэв). VENUE_BOX_HEIGHT
+ * (96px) дотор багтах мөрийн тоо = floor(96 / (фонт × 1.28)).
+ *
+ *   25px → 3 мөр × 24 =  72 тэмдэгт
+ *   22px → 3 мөр × 27 =  83
+ *   19px → 3 мөр × 32 =  96
+ *   16px → 4 мөр × 38 = 152
  */
 function venueFontSize(venue: string): number {
   const len = venue.length;
-  if (len <= 20) return 30;
-  if (len <= 40) return 26;
-  if (len <= 70) return 22;
-  return 18;
+  if (len <= 65) return 25;
+  if (len <= 80) return 22;
+  if (len <= 92) return 19;
+  return 16;
+}
+
+/** Фонт бүрийн багтаах дээд хэмжээ — үүнээс урт бол гурван цэгээр төгсгөнө. */
+const VENUE_CHAR_BUDGET: Record<number, number> = { 25: 72, 22: 83, 19: 96, 16: 152 };
+
+/**
+ * Хайчилбал ҮГНИЙ ДУНДУУР таслахгүй, гурван цэг нэмнэ. Зочны хаалган дээр
+ * хэрэгтэй мэдээлэл тул «...буудлын Их» гэж дуусдаг байдлыг зориуд арилгав.
+ */
+function fitVenue(venue: string, size: number): string {
+  const budget = VENUE_CHAR_BUDGET[size] ?? 152;
+  if (venue.length <= budget) return venue;
+  const cut = venue.slice(0, budget - 1);
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${(lastSpace > budget * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[,\s]+$/, '')}…`;
 }
 
 const SNOWFLAKE_PATH = 'M14 8l6 4 6-4M14 32l6-4 6 4M6 16l7 4-1 8M34 16l-7 4 1 8M6 24l7-4-1-8M34 24l-7-4 1-8';
 
+/**
+ * Цасан ширхэг. Байрлалууд нь зориуд гарчгийн баруун талын ХООСОН бүсэд
+ * сонгогдсон — гарчгийн хамгийн урт мөр («ЖИЛИЙН», 118px) ~644px хүрдэг тул
+ * x ≥ 760 нь ямар ч өгөгдөлтэй давхцахгүй нь баталгаатай.
+ */
 function Snowflake({ left, top, size }: { left: number; top: number; size: number }) {
   return (
     <svg
@@ -103,7 +141,7 @@ function Snowflake({ left, top, size }: { left: number; top: number; size: numbe
       viewBox="0 0 40 40"
       style={{ position: 'absolute', left, top, width: size, height: size }}
     >
-      <g stroke={RED} strokeWidth={2.4} strokeLinecap="round" fill="none">
+      <g stroke={WHITE} strokeWidth={2.4} strokeLinecap="round" fill="none">
         <line x1={20} y1={3} x2={20} y2={37} />
         <line x1={5.3} y1={11.5} x2={34.7} y2={28.5} />
         <line x1={5.3} y1={28.5} x2={34.7} y2={11.5} />
@@ -113,66 +151,77 @@ function Snowflake({ left, top, size }: { left: number; top: number; size: numbe
   );
 }
 
-/** Декорацийн зураасан код — бодит дугаарыг кодлодоггүй, зөвхөн ачааны баримтын харагдах байдлыг өгнө. */
-const BARCODE_WIDTHS = [
-  2, 3, 4, 6, 2, 3, 8, 2, 4, 3, 2, 6, 3, 2, 4, 8, 2, 3, 2, 5, 3, 2, 6, 2, 4, 3, 2, 8, 3, 2, 4, 2, 6, 3, 2,
-  4, 3, 8, 2, 3, 2, 4, 6, 2, 3, 2, 5, 3, 2, 4, 8, 2, 3, 4, 2,
-];
-
-function Barcode() {
-  const positions: Array<{ x: number; w: number }> = [];
-  let cursor = 0;
-  for (let i = 0; i < BARCODE_WIDTHS.length; i += 1) {
-    const w = BARCODE_WIDTHS[i];
-    const gap = i % 3 === 0 ? 4 : i % 2 === 0 ? 6 : 2;
-    cursor += gap;
-    positions.push({ x: cursor, w });
-    cursor += w;
-  }
-  const bars = positions.map(({ x, w }, i) => (
-    <rect key={i} x={x} y={0} width={w} height={100} />
+/** Чингэлэгийн хажуугийн атираа — 18 давталт × 60px = 1080px. */
+function Corrugation() {
+  const ribs = Array.from({ length: 18 }, (_, i) => (
+    <div key={i} style={{ display: 'flex', width: 60, height: H }}>
+      <div style={{ width: 36, height: H }} />
+      <div style={{ width: 10, height: H, background: RIB_DARK }} />
+      <div style={{ width: 4, height: H, background: RIB_LIGHT }} />
+      <div style={{ width: 10, height: H, background: RIB_DARK }} />
+    </div>
   ));
   return (
-    <svg
-      role="img"
-      aria-label="Зураасан код"
-      viewBox="0 0 363 100"
-      preserveAspectRatio="none"
-      style={{ width: 290, height: 84, flexShrink: 0 }}
-    >
-      <g fill={INK}>{bars}</g>
-    </svg>
-  );
-}
-
-function CustomsStamp() {
-  return (
-    <div style={{
-      position: 'absolute', right: 52, top: 128, width: 340, height: 140, boxSizing: 'border-box',
-      display: 'flex', padding: 6, border: `5px solid ${RED}`, borderRadius: 12,
-      transform: 'rotate(-11deg)', opacity: 0.92, overflow: 'hidden',
-    }}>
-      <div style={{
-        flexGrow: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-        border: `2px solid ${RED}`, borderRadius: 7, padding: '0 10px',
-      }}>
-        <svg aria-hidden="true" viewBox="0 0 100 100" style={{ width: 46, height: 46, flexShrink: 0 }}>
-          <path
-            fill={RED}
-            d="M28 90 L76 90 C76 78 74 62 70 50 C66 40 62 28 58 16 L52 24 L46 14 L42 26 C36 30 28 40 24 48 L16 54 L20 60 L30 58 C34 60 36 64 34 70 C32 78 28 84 28 90 Z"
-          />
-        </svg>
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, color: RED, lineHeight: 1.15 }}>
-          <div style={{ fontSize: 21, fontWeight: 700, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>БАТАЛГААЖСАН</div>
-          <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>МОРИН ЖИЛ · 2026</div>
-        </div>
-      </div>
+    <div style={{ position: 'absolute', left: 0, top: 0, width: W, height: H, display: 'flex' }}>
+      {ribs}
     </div>
   );
 }
 
-const cellLabel = (text: string) => (
-  <div style={{ fontSize: 18, letterSpacing: 3, color: MUTED }}>{text}</div>
+/**
+ * Цоожны хошуу. Satori-д linear-gradient-ээс хамаарахгүйн тулд гурван хатуу
+ * өнгийн багана болгон угсрав — ижил металл эффект, гэхдээ бүрэн тодорхой.
+ */
+function LockRod({ left }: { left: number }) {
+  return (
+    <div style={{ position: 'absolute', left, top: 0, width: 16, height: H, display: 'flex' }}>
+      <div style={{ width: 5, height: H, background: ROD_EDGE }} />
+      <div style={{ width: 6, height: H, background: ROD_FACE }} />
+      <div style={{ width: 5, height: H, background: ROD_EDGE }} />
+    </div>
+  );
+}
+
+function RodKeeper({ left, top }: { left: number; top: number }) {
+  return <div style={{ position: 'absolute', left, top, width: 44, height: 30, background: INK, borderRadius: 3 }} />;
+}
+
+/** Дээврийн ирмэг дэх цасан давхарга. */
+function RoofSnow() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 1080 60"
+      preserveAspectRatio="none"
+      style={{ position: 'absolute', left: 0, top: 0, width: W, height: 60 }}
+    >
+      <path
+        fill={WHITE}
+        d="M0 0 H1080 V24 C1030 44 980 20 920 32 C860 46 800 22 740 34 C680 48 620 24 560 36 C500 50 440 22 380 32 C320 44 260 20 200 32 C140 46 80 24 0 34 Z"
+      />
+      <path
+        fill={RIB_DARK}
+        opacity={0.5}
+        d="M0 34 C80 24 140 46 200 32 C260 20 320 44 380 32 C440 22 500 50 560 36 C620 24 680 48 740 34 C800 22 860 46 920 32 C980 20 1030 44 1080 24 V30 C1030 50 980 26 920 38 C860 52 800 28 740 40 C680 54 620 30 560 42 C500 56 440 28 380 38 C320 50 260 26 200 38 C140 52 80 30 0 40 Z"
+      />
+    </svg>
+  );
+}
+
+/** Ялтасны булангийн шураг. */
+function PlateDots({ color }: { color: string }) {
+  return (
+    <div style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, display: 'flex' }}>
+      <div style={{ position: 'absolute', left: 8, top: 8, width: 8, height: 8, borderRadius: 4, background: color }} />
+      <div style={{ position: 'absolute', right: 8, top: 8, width: 8, height: 8, borderRadius: 4, background: color }} />
+      <div style={{ position: 'absolute', left: 8, bottom: 8, width: 8, height: 8, borderRadius: 4, background: color }} />
+      <div style={{ position: 'absolute', right: 8, bottom: 8, width: 8, height: 8, borderRadius: 4, background: color }} />
+    </div>
+  );
+}
+
+const stencilLabel = (text: string, color: string) => (
+  <div style={{ fontSize: 18, letterSpacing: 3, color }}>{text}</div>
 );
 
 export async function GET(
@@ -193,7 +242,7 @@ export async function GET(
   const venueText = event.venue || '—';
   const venueSize = venueFontSize(venueText);
   const venueLineHeight = 1.28;
-  const venueMaxHeight = Math.round(venueSize * venueLineHeight * 2); // 2 мөрөөс хэтрэхгүй
+  const venueShown = fitVenue(venueText, venueSize);
 
   const scoreLine = `ОНОО ${reg.bestScore.toLocaleString('mn-MN')}${standing ? ` · ${standing.rank}-Р БАЙР` : ''}`;
 
@@ -201,116 +250,131 @@ export async function GET(
     (
       <div style={{
         width: W, height: H, boxSizing: 'border-box', position: 'relative', overflow: 'hidden',
-        display: 'flex', flexDirection: 'column', background: PAPER, color: INK,
+        display: 'flex', flexDirection: 'column', background: RED, color: WHITE,
         fontFamily: 'DejaVuSans',
       }}>
-        <Snowflake left={28} top={330} size={34} />
-        <Snowflake left={1020} top={560} size={26} />
-        <Snowflake left={20} top={1120} size={22} />
+        <Corrugation />
+        <LockRod left={52} />
+        <LockRod left={1012} />
+        <RodKeeper left={38} top={120} />
+        <RodKeeper left={38} top={560} />
+        <RodKeeper left={38} top={1000} />
+        <RodKeeper left={38} top={1260} />
+        <RodKeeper left={998} top={120} />
+        <RodKeeper left={998} top={560} />
+        <RodKeeper left={998} top={1000} />
+        <RodKeeper left={998} top={1260} />
+        {/*
+          Хаалганы бариул. Урт нь 46px — контентын багана x=110..970 хооронд
+          эхэлдэг тул үүнээс урт бариул ЭЗЭМШИГЧийн нэрний эхний үсэг рүү
+          орж ирдэг (бодит зураг дээр 4px давхцаж байсныг хэмжиж илрүүлэв).
+        */}
+        <div style={{ position: 'absolute', left: 60, top: 760, width: 46, height: 16, background: INK, borderRadius: '0 8px 8px 0' }} />
+        <div style={{ position: 'absolute', left: 974, top: 760, width: 46, height: 16, background: INK, borderRadius: '8px 0 0 8px' }} />
+        <RoofSnow />
+        <Snowflake left={880} top={250} size={40} />
+        <Snowflake left={800} top={360} size={28} />
+        <Snowflake left={930} top={470} size={22} />
+        <Snowflake left={560} top={180} size={24} />
 
-        {/* толгой: лого + баримтын дугаар */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', padding: '60px 72px 0' }}>
-          <img src={logo} width={300} height={83} alt="Monlogistics Group" />
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-            {cellLabel('ТЭЭВРИЙН БАРИМТ')}
-            <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: 1 }}>{`№ ${reg.inviteCode}`}</div>
+        {/* толгой: лого (цагаан ялтас дээр) + морин жилийн тэмдэг */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '82px 110px 0' }}>
+          <div style={{
+            position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 360, height: 112, background: WHITE, borderRadius: 4,
+          }}>
+            <PlateDots color={PLATE_DOT} />
+            <img src={logo} width={300} height={83} alt="Monlogistics Group" />
+          </div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '12px 22px 12px 16px',
+            background: INK, borderRadius: 4, fontSize: 22, fontWeight: 700, letterSpacing: 2,
+          }}>
+            <svg aria-hidden="true" viewBox="0 0 100 100" style={{ width: 32, height: 32, flexShrink: 0 }}>
+              <path
+                fill={WHITE}
+                d="M28 90 L76 90 C76 78 74 62 70 50 C66 40 62 28 58 16 L52 24 L46 14 L42 26 C36 30 28 40 24 48 L16 54 L20 60 L30 58 C34 60 36 64 34 70 C32 78 28 84 28 90 Z"
+              />
+            </svg>
+            <span>МОРИН ЖИЛ · 2026</span>
           </div>
         </div>
-        <div style={{ display: 'flex', margin: '32px 72px 0', height: 3, background: INK }} />
 
-        {/* гарчиг + лац */}
-        <div style={{ display: 'flex', flexDirection: 'column', position: 'relative', padding: '38px 72px 0' }}>
-          <div style={{ fontSize: 92, fontWeight: 700, lineHeight: 1, letterSpacing: -1 }}>ШИНЭ ЖИЛИЙН</div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 26, fontSize: 92, fontWeight: 700, lineHeight: 1, letterSpacing: -1 }}>
-            <span>БАЯР</span><span style={{ color: RED }}>2026</span>
+        {/* стенсил гарчиг */}
+        <div style={{ display: 'flex', flexDirection: 'column', padding: '44px 110px 0' }}>
+          <div style={{ fontSize: 118, fontWeight: 700, lineHeight: 1, letterSpacing: 4 }}>ШИНЭ</div>
+          <div style={{ fontSize: 118, fontWeight: 700, lineHeight: 1, letterSpacing: 4 }}>ЖИЛИЙН</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 30, fontSize: 118, fontWeight: 700, lineHeight: 1, letterSpacing: 4 }}>
+            <span>БАЯР</span><span style={{ color: INK }}>2026</span>
           </div>
-          <div style={{ marginTop: 18, fontSize: 28, lineHeight: 1.2, color: INK }}>
-            Жилийн аян замын төгсгөлд — хамтдаа
-          </div>
-          <CustomsStamp />
+          <div style={{ marginTop: 20, fontSize: 28, lineHeight: 1.2 }}>Жилийн аян замын төгсгөлд — хамтдаа</div>
         </div>
 
-        {/* манифест */}
-        <div style={{ display: 'flex', flexDirection: 'column', margin: '44px 72px 0', border: `3px solid ${INK}` }}>
-          <div style={{ display: 'flex', flexDirection: 'column', padding: '20px 28px 22px' }}>
-            {cellLabel('ХҮЛЭЭН АВАГЧ · УРИЛГА ЭЗЭМШИГЧ')}
-            <div style={{ marginTop: 8, fontSize: nameFontSize(fullName), fontWeight: 700, lineHeight: 1.05 }}>
-              {fullName}
-            </div>
-            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 12, fontSize: 24, fontWeight: 700 }}>
-              <span style={{ display: 'flex', width: 12, height: 12, background: RED }} />
-              <span>{scoreLine}</span>
-            </div>
+        {/* эзэмшигч */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '40px 110px 0' }}>
+          <div style={{ display: 'flex', padding: '6px 14px', background: INK, borderRadius: 3, fontSize: 18, letterSpacing: 3 }}>
+            ЭЗЭМШИГЧ
           </div>
-
-          <div style={{ display: 'flex', borderTop: `3px solid ${INK}` }}>
-            <div style={{ display: 'flex', flexDirection: 'column', width: 290, padding: '20px 28px 22px' }}>
-              {cellLabel('ОГНОО')}
-              <div style={{ marginTop: 6, fontSize: 34, fontWeight: 700 }}>{event.date}</div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', width: 190, padding: '20px 28px 22px', borderLeft: `3px solid ${INK}` }}>
-              {cellLabel('ЦАГ')}
-              <div style={{ marginTop: 6, fontSize: 34, fontWeight: 700 }}>{event.time || '—'}</div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, padding: '20px 28px 22px', borderLeft: `3px solid ${INK}` }}>
-              {cellLabel('АЧАА')}
-              <div style={{ marginTop: 8, fontSize: 28, fontWeight: 700 }}>Баяр хөөр, 1 ш</div>
-            </div>
+          <div style={{ marginTop: 12, fontSize: nameFontSize(fullName), fontWeight: 700, lineHeight: 1.05 }}>
+            {fullName}
           </div>
+          <div style={{ marginTop: 8, fontSize: 26, fontWeight: 700, letterSpacing: 1 }}>{scoreLine}</div>
+        </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', padding: '20px 28px 22px', borderTop: `3px solid ${INK}` }}>
-            {cellLabel('БАЙРШИЛ · ХҮРЭХ ЦЭГ')}
+        {/* өгөгдлийн ялтас */}
+        <div style={{
+          position: 'relative', display: 'flex', margin: '40px 110px 0', padding: '26px 32px',
+          gap: 36, background: INK, borderRadius: 4,
+        }}>
+          <PlateDots color={INK_DOT} />
+          <div style={{ display: 'flex', flexDirection: 'column', width: 200 }}>
+            {stencilLabel('ОГНОО', INK_LABEL)}
+            <div style={{ marginTop: 6, fontSize: 32, fontWeight: 700 }}>{event.date}</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', width: 110 }}>
+            {stencilLabel('ЦАГ', INK_LABEL)}
+            <div style={{ marginTop: 6, fontSize: 32, fontWeight: 700 }}>{event.time || '—'}</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', width: VENUE_WIDTH }}>
+            {stencilLabel('БАЙРШИЛ', INK_LABEL)}
             <div style={{
-              marginTop: 6, width: VENUE_WIDTH, maxHeight: venueMaxHeight, overflow: 'hidden',
+              marginTop: 8, width: VENUE_WIDTH, height: VENUE_BOX_HEIGHT, overflow: 'hidden',
               fontSize: venueSize, fontWeight: 700, lineHeight: venueLineHeight,
             }}>
-              {venueText}
-            </div>
-          </div>
-
-          {/*
-            ДУГААР (урилгын код) бол зочны хаалган дээр хэрэгтэй цорын ганц
-            талбар тул БАЙРШИЛ (дээрх, чөлөөт урттай) ямар ч тохиолдолд үүнийг
-            шахахгүй: энэ мөр өөрийн тогтмол padding, фонт хэмжээтэй, БАЙРШИЛ-ийн
-            агуулгын уртаас үл хамааран үргэлж бүтэн харагдана (Критик алдаа:
-            урт хаяг ДУГААРыг 1080px canvas-аас гадагшлуулж байсныг засав).
-          */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 36, padding: '20px 28px 24px', borderTop: `3px solid ${INK}` }}>
-            <Barcode />
-            <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-              {cellLabel('ДУГААР · ХААЛГАН ДЭЭР ҮЗҮҮЛНЭ')}
-              <div style={{ marginTop: 4, fontSize: 64, fontWeight: 700, lineHeight: 1.05, letterSpacing: 1 }}>
-                {reg.inviteCode}
-              </div>
+              {venueShown}
             </div>
           </div>
         </div>
 
-        {/* тасдах шугам */}
-        <div style={{ display: 'flex', margin: '26px 72px 0', height: 0, borderTop: `3px dashed #B9B3A8` }} />
-
-        {/* тасалбар — хаалган дээр үзүүлэх хэсэг */}
+        {/*
+          Чингэлэгийн дугаарын ялтас. Урилгын код бол зочны хаалган дээр
+          хэрэгтэй цорын ганц талбар тул дээрх (чөлөөт урттай) БАЙРШИЛ-аас
+          тусдаа мөрөнд, өөрийн тогтмол фонт, padding-тай байрлана — БАЙРШИЛ
+          хэзээ ч үүнийг шахахгүй.
+        */}
         <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          margin: '22px 72px 0', padding: '22px 32px', background: RED, color: '#FFFFFF',
+          position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          margin: '22px 110px 0', padding: '22px 32px 24px', background: WHITE, color: INK, borderRadius: 4,
         }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexGrow: 1, minWidth: 0, overflow: 'hidden' }}>
-            <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: 2 }}>ТАСАЛБАР · ХААЛГАН ДЭЭР</div>
-            <div style={{
-              fontSize: stubNameFontSize(fullName), fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden',
-            }}>
-              {fullName}
+          <PlateDots color={PLATE_DOT} />
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {stencilLabel('ДУГААР · ХААЛГАН ДЭЭР ҮЗҮҮЛНЭ', PLATE_LABEL)}
+            <div style={{ marginTop: 4, fontSize: 72, fontWeight: 700, lineHeight: 1.05, letterSpacing: 2 }}>
+              {reg.inviteCode}
             </div>
           </div>
-          <div style={{ display: 'flex', flexShrink: 0, fontSize: 34, fontWeight: 700, letterSpacing: 2, marginLeft: 24 }}>
-            {reg.inviteCode}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            width: 86, height: 86, border: `4px solid ${INK}`, fontSize: 44, fontWeight: 700,
+          }}>
+            1
           </div>
         </div>
 
         <div style={{ flexGrow: 1, display: 'flex' }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 72px 44px', fontSize: 16, letterSpacing: 1, color: MUTED }}>
-          <span>МОНЛОГИСТИКС ГРУПП · ШИНЭ ЖИЛИЙН БАЯР 2026</span>
-          <span>ХУВИЙН УРИЛГА · ДАХИН ОЛГОХГҮЙ</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 110px 56px', fontSize: 22, fontWeight: 700, letterSpacing: 3 }}>
+          <span>MLG · ШИНЭ ЖИЛИЙН БАЯР</span>
+          <span>ХУВИЙН УРИЛГА · 1 ХҮН</span>
         </div>
       </div>
     ),
