@@ -6,12 +6,17 @@ import {
 
 /** Тест бүрийн өмнө DB-г цэвэрлэж, sequence-ийг 1 рүү буцаана. */
 export async function resetDb(): Promise<void> {
-  // Шинэ (цэвэр) өгөгдлийн сан дээр sequence болон concurrency-хамгаалах индексүүд
-  // байхгүй байж болзошгүй тул цэвэрлэхийн өмнө үүсгэх ёстойг баталгаажуулна (идемпотент).
+  // Дараалал чухал: эхлээд TRUNCATE хийнэ — энэ нь sequence, индексүүд байгаа эсэхээс
+  // хамаардаггүй тул "бузар" (concurrency-хамгаалах unique индексүүдийг зөрчсөн,
+  // жишээ нь ижил position-той давхар мөртэй) өгөгдлийн сан дээр ч үргэлж ажиллаж,
+  // зөрчилтэй мөрүүдийг арилгана. Зөвхөн ҮҮНИЙ ДАРАА sequence болон индексүүдийг
+  // (идемпотент) баталгаажуулна — энэ үед хүснэгт хоосон тул давхардлын улмаас
+  // индекс үүсгэх нь бүтэлгүйтэх боломжгүй. Эцэст нь sequence-ийг 1 рүү буцаана
+  // (ensureInviteSequence() үүнээс өмнө ажилласан байх ёстой тул энэ дарааллаар).
+  await db.execute(sql`TRUNCATE attempt_answers, attempts, registrations RESTART IDENTITY CASCADE`);
   await ensureInviteSequence();
   await ensureOneOpenAttemptIndex();
   await ensureAttemptAnswerUniqueness();
-  await db.execute(sql`TRUNCATE attempt_answers, attempts, registrations RESTART IDENTITY CASCADE`);
   await db.execute(sql`ALTER SEQUENCE invite_seq_counter RESTART WITH 1`);
 }
 
