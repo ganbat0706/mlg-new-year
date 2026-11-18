@@ -41,6 +41,12 @@ export const attempts = pgTable('attempts', {
   sortDone: boolean('sort_done').notNull().default(false),
   stackDone: boolean('stack_done').notNull().default(false),
   memoDone: boolean('memo_done').notNull().default(false),
+  // Тоглоом бүрийн "begin" дуудлагын серверийн wall-clock цаг (P2-3) — submit үед
+  // бодит хугацаа өнгөрсөн эсэхийг шалгахад ашиглана. events дотоод t утгуудад
+  // ИТГЭХГҮЙ (script бол тэдгээрийг хуурамчаар зөв зайтай зохиож болно).
+  sortStartedAt: timestamp('sort_started_at', { withTimezone: true }),
+  stackStartedAt: timestamp('stack_started_at', { withTimezone: true }),
+  memoStartedAt: timestamp('memo_started_at', { withTimezone: true }),
   /** Сэжигтэй оролдлого — min event gap зөрчсөн эсвэл memo-г алдаагүй дуусгасан. Шагнахын өмнө админ шалгана. */
   flagged: boolean('flagged').notNull().default(false),
   flagReason: text('flag_reason'),

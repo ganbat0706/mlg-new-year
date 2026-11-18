@@ -3,12 +3,23 @@ import {
 } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { attempts, attemptAnswers, questions, registrations } from '@/lib/db/schema';
-import { GAME, QUIZ, REACTION } from '@/lib/config';
+import {
+  GAME, QUIZ, REACTION, SORT, STACK, MEMO, PLAY,
+} from '@/lib/config';
 import { mulberry32, pickN } from '@/lib/rng';
 import {
   scoreAnswer, buildOptionOrder, applyOptionOrder, resolveChoice,
 } from '@/lib/quiz';
-import { generateSpawnSchedule, scoreTaps, type SpawnItem, type Tap } from '@/lib/reaction';
+import { generateSpawnSchedule, scoreTaps, type Tap } from '@/lib/reaction';
+import {
+  generateSortSchedule, scoreSort, maxSortScore, type SortItem, type SortEvent,
+} from '@/lib/games/sort';
+import {
+  generateStackSchedule, scoreStack, maxStackScore, type StackLevel, type StackEvent,
+} from '@/lib/games/stack';
+import {
+  generateMemoSchedule, scoreMemo, maxMemoScore, type MemoEvent,
+} from '@/lib/games/memo';
 import { totalScore } from '@/lib/scoring';
 import type { Result } from '@/lib/validation';
 
@@ -41,9 +52,14 @@ async function expireStaleAttempts(tx: Tx, registrationId: string): Promise<void
 
 export async function startAttempt(registrationId: string): Promise<Result<{
   attemptId: string;
-  spawnSchedule: SpawnItem[];
+  sortSchedule: SortItem[];
+  stackSchedule: StackLevel[];
+  memoSchedule: number[];
   answered: number;
   reactionDone: boolean;
+  sortDone: boolean;
+  stackDone: boolean;
+  memoDone: boolean;
 }>> {
   // Бүхэл шийдвэрийг нэг гүйлгээнд, тухайн бүртгэлийн мөрийг FOR UPDATE-ээр түгжсэн
   // байдлаар гүйцэтгэнэ. Ингэснээр нэг тоглогчийн зэрэг ирсэн startAttempt хүсэлтүүд
@@ -76,9 +92,14 @@ export async function startAttempt(registrationId: string): Promise<Result<{
         ok: true,
         value: {
           attemptId: open.id,
-          spawnSchedule: generateSpawnSchedule(open.seed),
+          sortSchedule: generateSortSchedule(open.seed),
+          stackSchedule: generateStackSchedule(open.seed),
+          memoSchedule: generateMemoSchedule(open.seed),
           answered,
           reactionDone: open.reactionDone,
+          sortDone: open.sortDone,
+          stackDone: open.stackDone,
+          memoDone: open.memoDone,
         },
       };
     }
@@ -107,9 +128,14 @@ export async function startAttempt(registrationId: string): Promise<Result<{
       ok: true,
       value: {
         attemptId: created.id,
-        spawnSchedule: generateSpawnSchedule(seed),
+        sortSchedule: generateSortSchedule(seed),
+        stackSchedule: generateStackSchedule(seed),
+        memoSchedule: generateMemoSchedule(seed),
         answered: 0,
         reactionDone: false,
+        sortDone: false,
+        stackDone: false,
+        memoDone: false,
       },
     };
   });
@@ -275,8 +301,213 @@ export async function submitReaction(
   return { ok: true, value: { reactionScore: score } };
 }
 
+/** Phase 2-ын гурван шинэ тоглоом (P2-3). */
+export type GameName = 'sort' | 'stack' | 'memo';
+
+/** Олон шалтгаан хуримтлагдаж болох тул хоосон бол шинээр, үгүй бол "; "-ээр залгана. */
+function appendReason(existing: string | null, reason: string): string {
+  return existing ? `${existing}; ${reason}` : reason;
+}
+
+/**
+ * Тухайн тоглоомын серверийн wall-clock эхлэх цагийг тэмдэглэнэ. Үйлдлийн
+ * жагсаалт дотоод `t` утгуудад итгэхгүй байхын цорын ганц учир — script бүх
+ * `t`-г зөв зайтай хуурамчаар зохиож, хуваарийг шууд (0 секундэд) тоглож
+ * чадна. Submit үед энэ цагаас хойш БОДИТООР хэд секунд өнгөрснийг шалгана.
+ *
+ * submitSort/submitStack/submitMemo-той адил зөвхөн attempts хүснэгтэд
+ * хандана, registrations-д огт хүрэхгүй тул "registrations ЭХЭЛЖ, дараа нь
+ * attempts — ЯМАГТ" гэсэн түгжээний дарааллыг эвдэх эрсдэлгүй.
+ */
+export async function beginGame(
+  attemptId: string,
+  game: GameName,
+): Promise<Result<{ startedAt: string }>> {
+  return db.transaction(async (tx) => {
+    const [attempt] = await tx.select().from(attempts)
+      .where(eq(attempts.id, attemptId)).for('update').limit(1);
+    if (!attempt) return fail('Оролдлого олдсонгүй');
+    if (attempt.status !== 'in_progress') return fail('Энэ оролдлого дууссан байна');
+
+    const done = game === 'sort' ? attempt.sortDone
+      : game === 'stack' ? attempt.stackDone
+        : attempt.memoDone;
+    if (done) return fail('Энэ тоглоом аль хэдийн илгээгдсэн байна');
+
+    const startedAt = new Date();
+    if (game === 'sort') {
+      await tx.update(attempts).set({ sortStartedAt: startedAt }).where(eq(attempts.id, attemptId));
+    } else if (game === 'stack') {
+      await tx.update(attempts).set({ stackStartedAt: startedAt }).where(eq(attempts.id, attemptId));
+    } else {
+      await tx.update(attempts).set({ memoStartedAt: startedAt }).where(eq(attempts.id, attemptId));
+    }
+
+    return { ok: true, value: { startedAt: startedAt.toISOString() } };
+  });
+}
+
+export async function submitSort(
+  attemptId: string,
+  events: SortEvent[],
+): Promise<Result<{ score: number; maxScore: number; flagged: boolean }>> {
+  // submitSort/submitStack/submitMemo нь зөвхөн attempts хүснэгтэд хандана,
+  // registrations-д огт хүрэхгүй тул "registrations ЭХЭЛЖ, дараа нь attempts —
+  // ЯМАГТ" гэсэн (startAttempt/finishAttempt-ийн) түгжээний дарааллыг эвдэх
+  // эрсдэлгүй.
+  //
+  // Бүх шийдвэрийг нэг гүйлгээнд, тухайн attempt мөрийг FOR UPDATE-ээр
+  // түгжсэн байдлаар гүйцэтгэнэ. Ингэснээр нэг тоглоомд зэрэг ирсэн submit
+  // хүсэлтүүд дараалж, зөвхөн нэг нь оноо бичнэ — бусад нь (түгжээ суллагдсаны
+  // дараа sortDone аль хэдийн true болсныг хараад) татгалзана. Үгүй бол энэ
+  // нь projectийн давтсан алдаа — score inflation bug — болох байв.
+  return db.transaction(async (tx) => {
+    const [attempt] = await tx.select().from(attempts)
+      .where(eq(attempts.id, attemptId)).for('update').limit(1);
+    if (!attempt) return fail('Оролдлого олдсонгүй');
+    if (attempt.status !== 'in_progress') return fail('Энэ оролдлого дууссан байна');
+    if (attempt.sortDone) return fail('Энэ тоглоом аль хэдийн илгээгдсэн байна');
+    if (!attempt.sortStartedAt) return fail('Тоглоом эхлээгүй байна (begin дуудагдаагүй)');
+
+    const schedule = generateSortSchedule(attempt.seed);
+    const elapsedMs = Date.now() - attempt.sortStartedAt.getTime();
+
+    let flagged = attempt.flagged;
+    let flagReason = attempt.flagReason;
+    let score: number;
+
+    if (elapsedMs < SORT.DURATION_MS * PLAY.MIN_ELAPSED_RATIO) {
+      // Бодитоор хангалттай хугацаа өнгөрөөгүй — хүн энэ хурдаар тоглох
+      // боломжгүй. Бүхэл оролдлогыг татгалзахгүй, зөвхөн энэ тоглоомыг 0
+      // болгож, тэмдэглэнэ (шагнахаас өмнө админ шалгана).
+      score = 0;
+      flagged = true;
+      flagReason = appendReason(flagReason, 'sort: бодит хугацаа хэт богино (боломжгүй хурд)');
+    } else {
+      const result = scoreSort(schedule, events);
+      score = result.score;
+      if (result.suspicious) {
+        flagged = true;
+        flagReason = appendReason(flagReason, 'sort: үйлдлийн доод зай (200мс) зөрчигдсөн');
+      }
+    }
+
+    await tx.update(attempts)
+      .set({
+        sortScore: score, sortDone: true, flagged, flagReason,
+      })
+      .where(eq(attempts.id, attemptId));
+
+    return { ok: true, value: { score, maxScore: maxSortScore(schedule), flagged } };
+  });
+}
+
+export async function submitStack(
+  attemptId: string,
+  events: StackEvent[],
+): Promise<Result<{ score: number; maxScore: number; flagged: boolean }>> {
+  // Тайлбар: submitSort-той ижил — зөвхөн attempts хүснэгтэд хандана, нэг
+  // гүйлгээнд attempt мөрийг FOR UPDATE-ээр түгжиж, төлвийг ТҮГЖЭЭНИЙ ДОТОР
+  // дахин шалгана.
+  return db.transaction(async (tx) => {
+    const [attempt] = await tx.select().from(attempts)
+      .where(eq(attempts.id, attemptId)).for('update').limit(1);
+    if (!attempt) return fail('Оролдлого олдсонгүй');
+    if (attempt.status !== 'in_progress') return fail('Энэ оролдлого дууссан байна');
+    if (attempt.stackDone) return fail('Энэ тоглоом аль хэдийн илгээгдсэн байна');
+    if (!attempt.stackStartedAt) return fail('Тоглоом эхлээгүй байна (begin дуудагдаагүй)');
+
+    const schedule = generateStackSchedule(attempt.seed);
+    const elapsedMs = Date.now() - attempt.stackStartedAt.getTime();
+
+    let flagged = attempt.flagged;
+    let flagReason = attempt.flagReason;
+    let score: number;
+
+    if (elapsedMs < STACK.DURATION_MS * PLAY.MIN_ELAPSED_RATIO) {
+      score = 0;
+      flagged = true;
+      flagReason = appendReason(flagReason, 'stack: бодит хугацаа хэт богино (боломжгүй хурд)');
+    } else {
+      const result = scoreStack(schedule, events);
+      score = result.score;
+      if (result.suspicious) {
+        flagged = true;
+        flagReason = appendReason(flagReason, 'stack: үйлдлийн доод зай (200мс) зөрчигдсөн');
+      }
+    }
+
+    await tx.update(attempts)
+      .set({
+        stackScore: score, stackDone: true, flagged, flagReason,
+      })
+      .where(eq(attempts.id, attemptId));
+
+    return { ok: true, value: { score, maxScore: maxStackScore(schedule), flagged } };
+  });
+}
+
+export async function submitMemo(
+  attemptId: string,
+  events: MemoEvent[],
+): Promise<Result<{ score: number; maxScore: number; flagged: boolean }>> {
+  // Тайлбар: submitSort-той ижил — зөвхөн attempts хүснэгтэд хандана, нэг
+  // гүйлгээнд attempt мөрийг FOR UPDATE-ээр түгжиж, төлвийг ТҮГЖЭЭНИЙ ДОТОР
+  // дахин шалгана.
+  return db.transaction(async (tx) => {
+    const [attempt] = await tx.select().from(attempts)
+      .where(eq(attempts.id, attemptId)).for('update').limit(1);
+    if (!attempt) return fail('Оролдлого олдсонгүй');
+    if (attempt.status !== 'in_progress') return fail('Энэ оролдлого дууссан байна');
+    if (attempt.memoDone) return fail('Энэ тоглоом аль хэдийн илгээгдсэн байна');
+    if (!attempt.memoStartedAt) return fail('Тоглоом эхлээгүй байна (begin дуудагдаагүй)');
+
+    const schedule = generateMemoSchedule(attempt.seed);
+    const elapsedMs = Date.now() - attempt.memoStartedAt.getTime();
+
+    let flagged = attempt.flagged;
+    let flagReason = attempt.flagReason;
+    let score: number;
+
+    if (elapsedMs < MEMO.DURATION_MS * PLAY.MIN_ELAPSED_RATIO) {
+      score = 0;
+      flagged = true;
+      flagReason = appendReason(flagReason, 'memo: бодит хугацаа хэт богино (боломжгүй хурд)');
+    } else {
+      const result = scoreMemo(schedule, events);
+      score = result.score;
+      if (result.suspicious) {
+        flagged = true;
+        flagReason = appendReason(flagReason, 'memo: үйлдлийн доод зай (200мс) зөрчигдсөн');
+      }
+      if (result.perfect) {
+        // Алдаагүй (10,000-д 1 удаа тохиолдоход зохистой) дуусгавал — боломжтой ч
+        // ховор тул админ шалгахын тулд тэмдэглэнэ, оноог хасахгүй.
+        flagged = true;
+        flagReason = appendReason(flagReason, 'memo: алдаагүй дууссан (хэтэрхий төгс)');
+      }
+    }
+
+    await tx.update(attempts)
+      .set({
+        memoScore: score, memoDone: true, flagged, flagReason,
+      })
+      .where(eq(attempts.id, attemptId));
+
+    return { ok: true, value: { score, maxScore: maxMemoScore(schedule), flagged } };
+  });
+}
+
 export async function finishAttempt(attemptId: string): Promise<Result<{
-  totalScore: number; quizScore: number; reactionScore: number; bestScore: number;
+  totalScore: number;
+  quizScore: number;
+  sortScore: number;
+  stackScore: number;
+  memoScore: number;
+  /** Phase 2 — хасагдсан reaction тоглоомын оноо, нийлбэрт ОРОХГҮЙ (зөвхөн түүхэн мэдээлэл). */
+  reactionScore: number;
+  bestScore: number;
+  flagged: boolean;
 }>> {
   // registrationId-г мэдэхийн тулд attempts-ээс урьдчилж уншина — энэ нь түгжээгүй,
   // transaction-оос гадуурх энгийн SELECT тул дарааллын баталгаанд нөлөөлөхгүй.
@@ -302,7 +533,9 @@ export async function finishAttempt(attemptId: string): Promise<Result<{
     const answers = await tx.select({ points: attemptAnswers.points }).from(attemptAnswers)
       .where(eq(attemptAnswers.attemptId, attemptId));
     const quizScore = answers.reduce((sum, a) => sum + a.points, 0);
-    const total = totalScore(quizScore, attempt.reactionScore);
+    // Phase 2: totalScore = quiz + sort + stack + memo. reactionScore ороогүй —
+    // reaction тоглоом хасагдах шатандаа (P2-4-т бүрэн устгагдана).
+    const total = totalScore(quizScore, attempt.sortScore, attempt.stackScore, attempt.memoScore);
     const finishedAt = new Date();
 
     await tx.update(attempts).set({
@@ -319,7 +552,16 @@ export async function finishAttempt(attemptId: string): Promise<Result<{
 
     return {
       ok: true,
-      value: { totalScore: total, quizScore, reactionScore: attempt.reactionScore, bestScore },
+      value: {
+        totalScore: total,
+        quizScore,
+        sortScore: attempt.sortScore,
+        stackScore: attempt.stackScore,
+        memoScore: attempt.memoScore,
+        reactionScore: attempt.reactionScore,
+        bestScore,
+        flagged: attempt.flagged,
+      },
     };
   });
 }

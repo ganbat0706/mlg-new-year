@@ -4,10 +4,17 @@ export type Rankable = {
   bestFinishedAt: Date | null;
 };
 
-export function totalScore(quiz: number, reaction: number): number {
-  const q = Number.isFinite(quiz) ? Math.max(0, quiz) : 0;
-  const r = Number.isFinite(reaction) ? Math.max(0, reaction) : 0;
-  return Math.round(q + r);
+/**
+ * Нийт оноо — ямар ч тооны бүрэлдэхүүн хэсгийг (quiz, sort, stack, memo гэх мэт)
+ * хүлээн авна. Бүрэлдэхүүн бүрийг ХУВИ ХУВЬД нь 0-ээс доош үгүй болгож (clamp),
+ * дараа нь нэмж, эцэст нь нэг л удаа бүхэлд нь тойрог (round) хийнэ.
+ */
+export function totalScore(...scores: number[]): number {
+  const sum = scores.reduce(
+    (acc, s) => acc + (Number.isFinite(s) ? Math.max(0, s) : 0),
+    0,
+  );
+  return Math.round(sum);
 }
 
 /** Өндөр оноо эхэнд; тэнцвэл эрт дуусгасан нь дээгүүр; дуусгаагүй нь доор. */

@@ -8,6 +8,17 @@ import { QUIZ, REACTION, GAME } from '@/lib/config';
 import { db } from '@/lib/db';
 import { attempts, attemptAnswers, registrations } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
+import { generateSpawnSchedule } from '@/lib/reaction';
+
+/**
+ * startAttempt одоо spawnSchedule буцаахгүй болсон (P2-3 — sort/stack/memo
+ * сольсон) тул reaction-ий тестүүдэд хэрэгтэй хуваарийг attempt-ийн seed-ээр
+ * шууд дахин үүсгэнэ — submitReaction дотроо яг ижил зүйлийг хийдэг.
+ */
+async function spawnScheduleFor(attemptId: string) {
+  const [row] = await db.select().from(attempts).where(eq(attempts.id, attemptId));
+  return generateSpawnSchedule(row.seed);
+}
 
 const input = {
   lastName: 'батхүү', firstName: 'ганбат',
@@ -26,13 +37,18 @@ beforeEach(async () => {
 });
 
 describe('startAttempt', () => {
-  it('оролдлого үүсгэж spawn хуваарь буцаана', async () => {
+  it('оролдлого үүсгэж гурван тоглоомын хуваарь буцаана', async () => {
     const reg = await newRegistration();
     const r = await startAttempt(reg.id);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value.spawnSchedule.length).toBeGreaterThan(30);
+    expect(r.value.sortSchedule.length).toBe(12);
+    expect(r.value.stackSchedule.length).toBe(6);
+    expect(r.value.memoSchedule.length).toBe(12);
     expect(r.value.answered).toBe(0);
+    expect(r.value.sortDone).toBe(false);
+    expect(r.value.stackDone).toBe(false);
+    expect(r.value.memoDone).toBe(false);
   });
 
   it('дуусаагүй оролдлого байвал шинээр үүсгэхгүй, үргэлжлүүлнэ', async () => {
@@ -365,7 +381,8 @@ describe('submitReaction', () => {
     const a = await startAttempt(reg.id);
     if (!a.ok) throw new Error(a.error);
 
-    const good = a.value.spawnSchedule.filter((i) => i.kind === 'good').slice(0, 3);
+    const schedule = await spawnScheduleFor(a.value.attemptId);
+    const good = schedule.filter((i) => i.kind === 'good').slice(0, 3);
     const r = await submitReaction(
       a.value.attemptId,
       good.map((i) => ({ id: i.id, t: i.t + 100 })),
@@ -403,7 +420,7 @@ describe('submitReaction', () => {
 });
 
 describe('finishAttempt', () => {
-  it('нийт оноог тооцож бүртгэлийн дээд оноог шинэчилнэ', async () => {
+  it('нийт оноог тооцож бүртгэлийн дээд оноог шинэчилнэ, reactionScore нийлбэрт ОРОХГҮЙ', async () => {
     const reg = await newRegistration();
     const a = await startAttempt(reg.id);
     if (!a.ok) throw new Error(a.error);
@@ -414,15 +431,21 @@ describe('finishAttempt', () => {
       const correctLetter = ['A', 'B', 'C', 'D'][q.value.questionId % 4];
       await submitAnswer(a.value.attemptId, q.value.questionId, q.value.options.indexOf(correctLetter));
     }
-    const good = a.value.spawnSchedule.filter((i) => i.kind === 'good').slice(0, 5);
+    const schedule = await spawnScheduleFor(a.value.attemptId);
+    const good = schedule.filter((i) => i.kind === 'good').slice(0, 5);
     await submitReaction(a.value.attemptId, good.map((i) => ({ id: i.id, t: i.t + 50 })));
 
     const r = await finishAttempt(a.value.attemptId);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.value.quizScore).toBeGreaterThan(0);
+    // reactionScore хадгалагдсан хэвээр ч (reaction route хараахан хасаагүй) —
+    // Phase 2-ын totalScore = quiz + sort + stack + memo, reaction ОРОХГҮЙ.
     expect(r.value.reactionScore).toBe(REACTION.GOOD_POINTS * 5);
-    expect(r.value.totalScore).toBe(r.value.quizScore + r.value.reactionScore);
+    expect(r.value.sortScore).toBe(0);
+    expect(r.value.stackScore).toBe(0);
+    expect(r.value.memoScore).toBe(0);
+    expect(r.value.totalScore).toBe(r.value.quizScore);
     expect(r.value.bestScore).toBe(r.value.totalScore);
   });
 
@@ -431,15 +454,19 @@ describe('finishAttempt', () => {
 
     const first = await startAttempt(reg.id);
     if (!first.ok) throw new Error(first.error);
-    const good = first.value.spawnSchedule.filter((i) => i.kind === 'good').slice(0, 10);
-    await submitReaction(first.value.attemptId, good.map((i) => ({ id: i.id, t: i.t + 50 })));
+    for (let i = 0; i < QUIZ.QUESTION_COUNT; i++) {
+      const q = await serveNextQuestion(first.value.attemptId);
+      if (!q.ok || !q.value) break;
+      const correctLetter = ['A', 'B', 'C', 'D'][q.value.questionId % 4];
+      await submitAnswer(first.value.attemptId, q.value.questionId, q.value.options.indexOf(correctLetter));
+    }
     const r1 = await finishAttempt(first.value.attemptId);
 
     const second = await startAttempt(reg.id);
     if (!second.ok) throw new Error(second.error);
-    await submitReaction(second.value.attemptId, []);
     const r2 = await finishAttempt(second.value.attemptId);
 
+    expect(r1.ok && r1.value.totalScore).toBeGreaterThan(0);
     expect(r1.ok && r2.ok && r2.value.bestScore).toBe(r1.ok ? r1.value.totalScore : -1);
   });
 
