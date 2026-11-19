@@ -57,9 +57,24 @@ export const GAME = {
   INVITE_PREFIX: 'MLG-2026',
 } as const;
 
+/**
+ * Тоглоом хаагдах хугацааны АНХДАГЧ утга. `.env.example`-тэй ижил.
+ *
+ * Өмнө нь `GAME_CLOSES_AT` тохируулаагүй бол энэ функц алдаа шиддэг байв.
+ * Үүний үр дүнг production дээр бодитоор үзлээ: хувьсагч нэмэхээс өмнө
+ * нүүр хуудас, дүрэм, үр дүн — БҮХ хуудас 500 буцааж, ажилтанд ямар ч
+ * мэдээлэл үлдэхгүй цагаан дэлгэц харагдав. Тоглоомын хаалтын огноо нь
+ * кодод аль хэдийн бичигдсэн, тогтсон мэдээлэл тул түүнийг нууц
+ * тохиргоо мэт шаардах шалтгаан байхгүй.
+ *
+ * Буруу бичигдсэн утга бол ӨӨР асуудал — тэр нь бодит алдаа тул хэвээр
+ * шиднэ (чимээгүйгээр анхдагч руу буцвал арга хэмжээний баг буруу огноо
+ * тохируулсанаа мэдэхгүй өнгөрнө).
+ */
+const DEFAULT_CLOSES_AT = '2026-12-03T23:59:59+08:00';
+
 export function gameClosesAt(): Date {
-  const raw = process.env.GAME_CLOSES_AT;
-  if (!raw) throw new Error('GAME_CLOSES_AT тохируулаагүй байна');
+  const raw = process.env.GAME_CLOSES_AT ?? DEFAULT_CLOSES_AT;
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) throw new Error(`GAME_CLOSES_AT буруу: ${raw}`);
   return d;
