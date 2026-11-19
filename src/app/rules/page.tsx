@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import {
-  isGameOpen, SORT, STACK, MEMO, GAME,
+  isGameOpen, SORT, STACK, MEMO, DROP, GAME,
 } from '@/lib/config';
 import { Brand } from '@/components/Brand';
 
@@ -38,7 +38,13 @@ export default function RulesPage() {
           </p>
         </li>
         <li>
-          <h2 className="text-lg font-bold">4. Оролдлого — {GAME.MAX_ATTEMPTS} удаа</h2>
+          <h2 className="text-lg font-bold">4. Агаараас буулгах — {DROP.DURATION_MS / 1000} секунд</h2>
+          <p className="mt-1.5 text-base leading-relaxed text-[#6B6568]">
+            MLG онгоц хөндлөн нисэхэд ачаагаа буулгаж контейнерийн ханыг нураана.
+          </p>
+        </li>
+        <li>
+          <h2 className="text-lg font-bold">5. Оролдлого — {GAME.MAX_ATTEMPTS} удаа</h2>
           <p className="mt-1.5 text-base leading-relaxed text-[#6B6568]">
             Хамгийн сайн оноо тооцогдоно. Эхний {GAME.PRIZE_PLACES} байр шагналтай.
           </p>

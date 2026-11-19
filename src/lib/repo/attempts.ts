@@ -4,7 +4,7 @@ import {
 import { db } from '@/lib/db';
 import { attempts, registrations } from '@/lib/db/schema';
 import {
-  GAME, SORT, STACK, MEMO, PLAY,
+  GAME, SORT, STACK, MEMO, DROP, PLAY,
 } from '@/lib/config';
 import {
   generateSortSchedule, scoreSort, maxSortScore, type SortItem, type SortEvent,
@@ -15,6 +15,9 @@ import {
 import {
   generateMemoSchedule, scoreMemo, maxMemoScore, type MemoEvent,
 } from '@/lib/games/memo';
+import {
+  generateDropSchedule, scoreDrop, maxDropScore, type DropSchedule, type DropEvent,
+} from '@/lib/games/drop';
 import { totalScore } from '@/lib/scoring';
 import type { Result } from '@/lib/validation';
 
@@ -48,9 +51,11 @@ export async function startAttempt(registrationId: string): Promise<Result<{
   sortSchedule: SortItem[];
   stackSchedule: StackLevel[];
   memoSchedule: number[];
+  dropSchedule: DropSchedule;
   sortDone: boolean;
   stackDone: boolean;
   memoDone: boolean;
+  dropDone: boolean;
 }>> {
   // Бүхэл шийдвэрийг нэг гүйлгээнд, тухайн бүртгэлийн мөрийг FOR UPDATE-ээр түгжсэн
   // байдлаар гүйцэтгэнэ. Ингэснээр нэг тоглогчийн зэрэг ирсэн startAttempt хүсэлтүүд
@@ -85,9 +90,11 @@ export async function startAttempt(registrationId: string): Promise<Result<{
           sortSchedule: generateSortSchedule(open.seed),
           stackSchedule: generateStackSchedule(open.seed),
           memoSchedule: generateMemoSchedule(open.seed),
+          dropSchedule: generateDropSchedule(open.seed),
           sortDone: open.sortDone,
           stackDone: open.stackDone,
           memoDone: open.memoDone,
+          dropDone: open.dropDone,
         },
       };
     }
@@ -112,9 +119,11 @@ export async function startAttempt(registrationId: string): Promise<Result<{
         sortSchedule: generateSortSchedule(seed),
         stackSchedule: generateStackSchedule(seed),
         memoSchedule: generateMemoSchedule(seed),
+        dropSchedule: generateDropSchedule(seed),
         sortDone: false,
         stackDone: false,
         memoDone: false,
+        dropDone: false,
       },
     };
   });
@@ -143,7 +152,7 @@ export async function listFlaggedReasons(): Promise<Map<string, string[]>> {
 }
 
 /** Гурван тоглоом. */
-export type GameName = 'sort' | 'stack' | 'memo';
+export type GameName = 'sort' | 'stack' | 'memo' | 'drop';
 
 /** Олон шалтгаан хуримтлагдаж болох тул хоосон бол шинээр, үгүй бол "; "-ээр залгана. */
 function appendReason(existing: string | null, reason: string): string {
@@ -172,7 +181,8 @@ export async function beginGame(
 
     const done = game === 'sort' ? attempt.sortDone
       : game === 'stack' ? attempt.stackDone
-        : attempt.memoDone;
+        : game === 'memo' ? attempt.memoDone
+          : attempt.dropDone;
     if (done) return fail('Энэ тоглоом аль хэдийн илгээгдсэн байна');
 
     const startedAt = new Date();
@@ -180,8 +190,10 @@ export async function beginGame(
       await tx.update(attempts).set({ sortStartedAt: startedAt }).where(eq(attempts.id, attemptId));
     } else if (game === 'stack') {
       await tx.update(attempts).set({ stackStartedAt: startedAt }).where(eq(attempts.id, attemptId));
-    } else {
+    } else if (game === 'memo') {
       await tx.update(attempts).set({ memoStartedAt: startedAt }).where(eq(attempts.id, attemptId));
+    } else {
+      await tx.update(attempts).set({ dropStartedAt: startedAt }).where(eq(attempts.id, attemptId));
     }
 
     return { ok: true, value: { startedAt: startedAt.toISOString() } };
@@ -339,9 +351,55 @@ export async function submitMemo(
   });
 }
 
+export async function submitDrop(
+  attemptId: string,
+  events: DropEvent[],
+): Promise<Result<{ score: number; maxScore: number; flagged: boolean }>> {
+  // submitSort/submitStack/submitMemo-той ижил: зөвхөн attempts хүснэгтэд
+  // хандана, нэг гүйлгээнд attempt мөрийг FOR UPDATE-ээр түгжиж, төлвийг
+  // ТҮГЖЭЭНИЙ ДОТОР дахин шалгана.
+  return db.transaction(async (tx) => {
+    const [attempt] = await tx.select().from(attempts)
+      .where(eq(attempts.id, attemptId)).for('update').limit(1);
+    if (!attempt) return fail('Оролдлого олдсонгүй');
+    if (attempt.status !== 'in_progress') return fail('Энэ оролдлого дууссан байна');
+    if (attempt.dropDone) return fail('Энэ тоглоом аль хэдийн илгээгдсэн байна');
+    if (!attempt.dropStartedAt) return fail('Тоглоом эхлээгүй байна (begin дуудагдаагүй)');
+
+    const schedule = generateDropSchedule(attempt.seed);
+    const elapsedMs = Date.now() - attempt.dropStartedAt.getTime();
+
+    let flagged = attempt.flagged;
+    let flagReason = attempt.flagReason;
+    let score: number;
+
+    if (elapsedMs < DROP.DURATION_MS * PLAY.MIN_ELAPSED_RATIO) {
+      score = 0;
+      flagged = true;
+      flagReason = appendReason(flagReason, 'drop: бодит хугацаа хэт богино (боломжгүй хурд)');
+    } else {
+      const result = scoreDrop(schedule, events);
+      score = result.score;
+      if (result.suspicious) {
+        flagged = true;
+        flagReason = appendReason(flagReason, 'drop: үйлдлийн доод зай (200мс) зөрчигдсөн');
+      }
+    }
+
+    await tx.update(attempts)
+      .set({
+        dropScore: score, dropDone: true, flagged, flagReason,
+      })
+      .where(eq(attempts.id, attemptId));
+
+    return { ok: true, value: { score, maxScore: maxDropScore(schedule), flagged } };
+  });
+}
+
 export async function finishAttempt(attemptId: string): Promise<Result<{
   totalScore: number;
   sortScore: number;
+  dropScore: number;
   stackScore: number;
   memoScore: number;
   bestScore: number;
@@ -372,8 +430,10 @@ export async function finishAttempt(attemptId: string): Promise<Result<{
     if (!attempt) return fail('Оролдлого олдсонгүй');
     if (attempt.status !== 'in_progress') return fail('Энэ оролдлого аль хэдийн дууссан байна');
 
-    // totalScore = sort + stack + memo. Асуултын тоглоом хасагдсан.
-    const total = totalScore(attempt.sortScore, attempt.stackScore, attempt.memoScore);
+    // totalScore = sort + stack + memo + drop. Асуултын тоглоом хасагдсан.
+    const total = totalScore(
+      attempt.sortScore, attempt.stackScore, attempt.memoScore, attempt.dropScore,
+    );
     const finishedAt = new Date();
 
     await tx.update(attempts).set({
@@ -393,6 +453,7 @@ export async function finishAttempt(attemptId: string): Promise<Result<{
       value: {
         totalScore: total,
         sortScore: attempt.sortScore,
+        dropScore: attempt.dropScore,
         stackScore: attempt.stackScore,
         memoScore: attempt.memoScore,
         bestScore,

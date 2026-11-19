@@ -15,6 +15,7 @@ const ROWS = (d: FinishPayload) => [
   { label: 'Зөв зам', score: d.sortScore },
   { label: 'Контейнер овоолох', score: d.stackScore },
   { label: 'Хос манифест', score: d.memoScore },
+  { label: 'Агаараас буулгах', score: d.dropScore },
 ];
 
 /** cubic-bezier(p1x,p1y,p2x,p2y)-ийг Newton-ий аргаар бодож, x дэх y-г олно. */

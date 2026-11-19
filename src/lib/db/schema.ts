@@ -21,19 +21,22 @@ export const attempts = pgTable('attempts', {
   registrationId: uuid('registration_id').notNull().references(() => registrations.id),
   status: text('status').$type<'in_progress' | 'completed' | 'invalid'>().notNull().default('in_progress'),
   seed: integer('seed').notNull(),
-  // Гурван тоглоом — Зөв зам, Контейнер овоолох, Хос манифест.
+  // Дөрвөн тоглоом — Зөв зам, Контейнер овоолох, Хос манифест, Агаараас буулгах.
   sortScore: integer('sort_score').notNull().default(0),
   stackScore: integer('stack_score').notNull().default(0),
   memoScore: integer('memo_score').notNull().default(0),
+  dropScore: integer('drop_score').notNull().default(0),
   sortDone: boolean('sort_done').notNull().default(false),
   stackDone: boolean('stack_done').notNull().default(false),
   memoDone: boolean('memo_done').notNull().default(false),
+  dropDone: boolean('drop_done').notNull().default(false),
   // Тоглоом бүрийн "begin" дуудлагын серверийн wall-clock цаг (P2-3) — submit үед
   // бодит хугацаа өнгөрсөн эсэхийг шалгахад ашиглана. events дотоод t утгуудад
   // ИТГЭХГҮЙ (script бол тэдгээрийг хуурамчаар зөв зайтай зохиож болно).
   sortStartedAt: timestamp('sort_started_at', { withTimezone: true }),
   stackStartedAt: timestamp('stack_started_at', { withTimezone: true }),
   memoStartedAt: timestamp('memo_started_at', { withTimezone: true }),
+  dropStartedAt: timestamp('drop_started_at', { withTimezone: true }),
   /** Сэжигтэй оролдлого — min event gap зөрчсөн эсвэл memo-г алдаагүй дуусгасан. Шагнахын өмнө админ шалгана. */
   flagged: boolean('flagged').notNull().default(false),
   flagReason: text('flag_reason'),

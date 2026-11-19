@@ -509,3 +509,18 @@ html[data-stage="running"] .bulb {
 [data-hit="ok"].lane-btn  { background-color: #1A5C3D !important; }
 [data-hit="bad"].lane-btn { background-color: #8A0F15 !important; }
 .lane-btn { transition: background-color 120ms linear; }
+
+/* Агаараас буулгасан ачаа — онгоцноос ханын толгой хүртэл унана. */
+@keyframes cargo-fall {
+  from { top: 10%; opacity: 1; }
+  to   { top: 78%; opacity: 1; }
+}
+.cargo-fall {
+  height: 22px;
+  margin-left: -14px;
+  animation: cargo-fall var(--fall-ms, 400ms) cubic-bezier(0.4, 0, 1, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Унах хөдөлгөөнгүй — ачаа шууд ханын дээр гарч ирнэ. */
+  .cargo-fall { animation: none; top: 78%; }
+}

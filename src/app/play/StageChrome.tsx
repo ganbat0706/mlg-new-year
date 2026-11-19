@@ -19,7 +19,7 @@ export function StageReady({
 }) {
   return (
     <div className="enter sheet mt-6 text-center">
-      <span className="sheet-tag">Шат {step} / 3</span>
+      <span className="sheet-tag">Шат {step} / 4</span>
       <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-[#221E20]">{title}</h2>
       <p className="mx-auto mt-3 max-w-sm text-base leading-relaxed text-[#6B6568]">{children}</p>
       <button

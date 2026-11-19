@@ -11,28 +11,36 @@ import { audio } from '@/lib/audio';
 import { SortStage } from './SortStage';
 import { StackStage } from './StackStage';
 import { MemoStage } from './MemoStage';
+import { DropStage } from './DropStage';
 import type { SortItem } from '@/lib/games/sort';
 import type { StackLevel } from '@/lib/games/stack';
+import type { DropSchedule } from '@/lib/games/drop';
 
 type StartData = {
   attemptId: string;
   sortSchedule: SortItem[];
   stackSchedule: StackLevel[];
   memoSchedule: number[];
+  dropSchedule: DropSchedule;
   sortDone: boolean;
   stackDone: boolean;
   memoDone: boolean;
+  dropDone: boolean;
 };
 
-type Progress = { sort: boolean; stack: boolean; memo: boolean };
+type Progress = { sort: boolean; stack: boolean; memo: boolean; drop: boolean };
 
-type Stage = 'loading' | 'sort' | 'stack' | 'memo' | 'finishing' | 'error';
+type Stage = 'loading' | 'sort' | 'stack' | 'memo' | 'drop' | 'finishing' | 'error';
 
-/** Эхлэх дэс дараа нь: Зөв зам → Контейнер овоолох → Хос манифест → finish. */
+/**
+ * Эхлэх дэс дараа нь: Зөв зам → Контейнер овоолох → Хос манифест →
+ * Агаараас буулгах → finish.
+ */
 function firstUnfinished(p: Progress): Stage {
   if (!p.sort) return 'sort';
   if (!p.stack) return 'stack';
   if (!p.memo) return 'memo';
+  if (!p.drop) return 'drop';
   return 'finishing';
 }
 
@@ -40,7 +48,7 @@ export function PlayClient() {
   const router = useRouter();
   const [stage, setStage] = useState<Stage>('loading');
   const [start, setStart] = useState<StartData | null>(null);
-  const [progress, setProgress] = useState<Progress>({ sort: false, stack: false, memo: false });
+  const [progress, setProgress] = useState<Progress>({ sort: false, stack: false, memo: false, drop: false });
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -58,11 +66,13 @@ export function PlayClient() {
         sort: res.data.sortDone,
         stack: res.data.stackDone,
         memo: res.data.memoDone,
+        drop: res.data.dropDone,
       });
       // Дуусаагүй эхний тоглоомоос эхэлнэ (оролдлогоо завсарлаад буцаж ирсэн
       // тохиолдолд дууссан тоглоомыг давтахгүй).
       const ns = firstUnfinished({
-        sort: res.data.sortDone, stack: res.data.stackDone, memo: res.data.memoDone,
+        sort: res.data.sortDone, stack: res.data.stackDone,
+        memo: res.data.memoDone, drop: res.data.dropDone,
       });
       setStage(ns === 'finishing' ? 'sort' : ns);
     })();
@@ -142,11 +152,22 @@ export function PlayClient() {
     );
   }
 
+  if (stage === 'memo') {
+    return (
+      <MemoStage
+        attemptId={start.attemptId}
+        schedule={start.memoSchedule}
+        onDone={() => afterGame('memo')}
+        onError={(m) => { setError(m); setStage('error'); }}
+      />
+    );
+  }
+
   return (
-    <MemoStage
+    <DropStage
       attemptId={start.attemptId}
-      schedule={start.memoSchedule}
-      onDone={() => afterGame('memo')}
+      schedule={start.dropSchedule}
+      onDone={() => afterGame('drop')}
       onError={(m) => { setError(m); setStage('error'); }}
     />
   );

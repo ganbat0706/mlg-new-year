@@ -7,6 +7,7 @@ export type FinishPayload = {
   sortScore: number;
   stackScore: number;
   memoScore: number;
+  dropScore: number;
   bestScore: number;
   flagged: boolean;
   attemptsUsed: number;

@@ -1,16 +1,17 @@
 import {
-  beginGame, submitSort, submitStack, submitMemo, type GameName,
+  beginGame, submitSort, submitStack, submitMemo, submitDrop, type GameName,
 } from '@/lib/repo/attempts';
 import { PLAY } from '@/lib/config';
 import { ok, bad, boom, readJson } from '@/lib/http';
 import type { SortEvent, SortLane } from '@/lib/games/sort';
 import type { StackEvent } from '@/lib/games/stack';
 import type { MemoEvent } from '@/lib/games/memo';
+import type { DropEvent } from '@/lib/games/drop';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const GAME_NAMES: readonly GameName[] = ['sort', 'stack', 'memo'];
+const GAME_NAMES: readonly GameName[] = ['sort', 'stack', 'memo', 'drop'];
 
 function isGameName(value: string): value is GameName {
   return (GAME_NAMES as readonly string[]).includes(value);
@@ -51,8 +52,17 @@ function parseMemoEvents(raw: unknown[]): MemoEvent[] {
     .map((e) => ({ card: e.card, t: e.t }));
 }
 
+function parseDropEvents(raw: unknown[]): DropEvent[] {
+  return raw
+    .filter((e): e is { index: number; t: number } =>
+      typeof e === 'object' && e !== null &&
+      typeof (e as { index?: unknown }).index === 'number' &&
+      typeof (e as { t?: unknown }).t === 'number')
+    .map((e) => ({ index: e.index, t: e.t }));
+}
+
 /**
- * Гурван шинэ тоглоомын (sort/stack/memo) ганц route. Хоёр хэлбэрийн body
+ * Дөрвөн тоглоомын (sort/stack/memo/drop) ганц route. Хоёр хэлбэрийн body
  * хүлээн авна:
  *  - `{ begin: true }` — тухайн тоглоомын серверийн эхлэх цагийг тэмдэглэнэ.
  *  - `{ events: [...] }` — үйлдлийн жагсаалтыг дахин тоглож оноо тооцно.
@@ -92,7 +102,13 @@ export async function POST(
       return ok(result.value);
     }
 
-    const result = await submitMemo(id, parseMemoEvents(body.events));
+    if (game === 'memo') {
+      const result = await submitMemo(id, parseMemoEvents(body.events));
+      if (!result.ok) return bad(result.error);
+      return ok(result.value);
+    }
+
+    const result = await submitDrop(id, parseDropEvents(body.events));
     if (!result.ok) return bad(result.error);
     return ok(result.value);
   } catch (err) {

@@ -49,6 +49,22 @@ export const PLAY = {
   MIN_ELAPSED_RATIO: 0.8,
 } as const;
 
+/**
+ * 4. Агаараас буулгах — MLG онгоц хөндлөн нисэхэд ачаа буулгаж контейнерийн
+ * ханыг нураана. Дээд оноо: 12 буулгалт × 80 = 960 (бусад гурвантай ижил).
+ */
+export const DROP = {
+  DURATION_MS: 15_000,
+  /** Ханын багана. Нийт контейнер = DROPS, өндөр нь багана бүрт 1..3. */
+  COLS: 6,
+  DROPS: 12,
+  /** Ачаа унах хугацаа — энэ хооронд дахин буулгаж болохгүй (STACK.DROP_MS-тэй ижил санаа). */
+  FALL_MS: 400,
+  BASE_PERIOD_MS: 1_900,
+  PERIOD_STEP_MS: 60,
+  HIT_POINTS: 80,
+} as const;
+
 export const GAME = {
   MAX_ATTEMPTS: 3,
   PRIZE_PLACES: 5,
