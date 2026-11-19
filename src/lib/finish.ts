@@ -4,7 +4,6 @@ const KEY = 'mlg:lastFinish';
 
 export type FinishPayload = {
   totalScore: number;
-  quizScore: number;
   sortScore: number;
   stackScore: number;
   memoScore: number;

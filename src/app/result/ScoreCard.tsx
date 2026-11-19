@@ -11,7 +11,6 @@ import type { FinishPayload } from '@/lib/finish';
  */
 
 const ROWS = (d: FinishPayload) => [
-  { label: 'Асуулт', score: d.quizScore },
   { label: 'Зөв зам', score: d.sortScore },
   { label: 'Контейнер овоолох', score: d.stackScore },
   { label: 'Хос манифест', score: d.memoScore },

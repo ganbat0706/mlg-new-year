@@ -1,15 +1,11 @@
 import {
-  and, asc, eq, isNull, lt, sql,
+  and, eq, lt, sql,
 } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { attempts, attemptAnswers, questions, registrations } from '@/lib/db/schema';
+import { attempts, registrations } from '@/lib/db/schema';
 import {
-  GAME, QUIZ, SORT, STACK, MEMO, PLAY,
+  GAME, SORT, STACK, MEMO, PLAY,
 } from '@/lib/config';
-import { mulberry32, pickN } from '@/lib/rng';
-import {
-  scoreAnswer, buildOptionOrder, applyOptionOrder, resolveChoice,
-} from '@/lib/quiz';
 import {
   generateSortSchedule, scoreSort, maxSortScore, type SortItem, type SortEvent,
 } from '@/lib/games/sort';
@@ -27,8 +23,6 @@ const fail = (error: string): Result<never> => ({ ok: false, error });
 /** `db.transaction`-ий callback-д өгөгдөх гүйлгээний бариул (tx) — db-тэй ижил query API-тай. */
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-/** `db` эсвэл түүний `tx` — query ажиллуулах аль ч бариулыг хүлээн авдаг функцэд зориулав. */
-type Exec = typeof db | Tx;
 
 /** 30 минутаас удсан in_progress оролдлогыг хүчингүй болгож, оролдлогын тоог буцаана. */
 async function expireStaleAttempts(tx: Tx, registrationId: string): Promise<void> {
@@ -54,7 +48,6 @@ export async function startAttempt(registrationId: string): Promise<Result<{
   sortSchedule: SortItem[];
   stackSchedule: StackLevel[];
   memoSchedule: number[];
-  answered: number;
   sortDone: boolean;
   stackDone: boolean;
   memoDone: boolean;
@@ -85,7 +78,6 @@ export async function startAttempt(registrationId: string): Promise<Result<{
       .limit(1);
 
     if (open) {
-      const answered = await countAnswered(tx, open.id);
       return {
         ok: true,
         value: {
@@ -93,7 +85,6 @@ export async function startAttempt(registrationId: string): Promise<Result<{
           sortSchedule: generateSortSchedule(open.seed),
           stackSchedule: generateStackSchedule(open.seed),
           memoSchedule: generateMemoSchedule(open.seed),
-          answered,
           sortDone: open.sortDone,
           stackDone: open.stackDone,
           memoDone: open.memoDone,
@@ -105,17 +96,10 @@ export async function startAttempt(registrationId: string): Promise<Result<{
       return fail(`Та ${GAME.MAX_ATTEMPTS} оролдлогоо бүрэн ашигласан байна`);
     }
 
-    const pool = await tx.select({ id: questions.id }).from(questions)
-      .where(eq(questions.active, true));
-    if (pool.length < QUIZ.QUESTION_COUNT) {
-      return fail('Асуултын сан хүрэлцэхгүй байна');
-    }
-
     const seed = Math.floor(Math.random() * 2_147_483_647);
-    const questionIds = pickN(pool.map((q) => q.id), QUIZ.QUESTION_COUNT, mulberry32(seed));
 
     const [created] = await tx.insert(attempts)
-      .values({ registrationId, seed, questionIds })
+      .values({ registrationId, seed })
       .returning();
     await tx.update(registrations)
       .set({ attemptsUsed: sql`${registrations.attemptsUsed} + 1` })
@@ -128,7 +112,6 @@ export async function startAttempt(registrationId: string): Promise<Result<{
         sortSchedule: generateSortSchedule(seed),
         stackSchedule: generateStackSchedule(seed),
         memoSchedule: generateMemoSchedule(seed),
-        answered: 0,
         sortDone: false,
         stackDone: false,
         memoDone: false,
@@ -159,145 +142,7 @@ export async function listFlaggedReasons(): Promise<Map<string, string[]>> {
   return byReg;
 }
 
-async function countAnswered(tx: Tx, attemptId: string): Promise<number> {
-  const rows = await tx.select({ id: attemptAnswers.id }).from(attemptAnswers)
-    .where(and(eq(attemptAnswers.attemptId, attemptId), sql`${attemptAnswers.answeredAt} IS NOT NULL`));
-  return rows.length;
-}
-
-export type ServedQuestion = {
-  position: number;
-  total: number;
-  questionId: number;
-  text: string;
-  options: string[];
-  timeLimitMs: number;
-};
-
-export async function serveNextQuestion(
-  attemptId: string,
-): Promise<Result<ServedQuestion | null>> {
-  // serveNextQuestion нь зөвхөн attempts болон attempt_answers хүснэгтэд хандана,
-  // registrations-д огт хүрэхгүй тул "registrations ЭХЭЛЖ, дараа нь attempts — ЯМАГТ"
-  // гэсэн (startAttempt/finishAttempt-ийн) түгжээний дарааллыг эвдэх эрсдэлгүй.
-  //
-  // Бүх шийдвэрийг нэг гүйлгээнд, тухайн attempt мөрийг FOR UPDATE-ээр түгжсэн
-  // байдлаар гүйцэтгэнэ. Ингэснээр нэг оролдлогод зэрэг ирсэн serveNextQuestion
-  // хүсэлтүүд дараалж, зөвхөн нэг нь шинэ асуулт үүсгэнэ — бусад нь ижил (pending)
-  // асуултыг буцаана. Өөр attempt-үүд хоорондоо түгждэггүй.
-  return db.transaction(async (tx) => {
-    const [attempt] = await tx.select().from(attempts)
-      .where(eq(attempts.id, attemptId)).for('update').limit(1);
-    if (!attempt) return fail('Оролдлого олдсонгүй');
-    if (attempt.status !== 'in_progress') return fail('Энэ оролдлого дууссан байна');
-
-    const served = await tx.select().from(attemptAnswers)
-      .where(eq(attemptAnswers.attemptId, attemptId))
-      .orderBy(asc(attemptAnswers.position));
-
-    // Хариулаагүй асуулт байвал ижлийг нь буцаана (refresh хийсэн тохиолдол,
-    // эсвэл зэрэг ирсэн хүсэлтийн хоёр дахь нь).
-    const pending = served.find((a) => a.answeredAt === null);
-    if (pending) {
-      const q = await loadQuestion(tx, pending.questionId);
-      if (!q) return fail('Асуулт олдсонгүй');
-      return {
-        ok: true,
-        value: {
-          position: pending.position,
-          total: QUIZ.QUESTION_COUNT,
-          questionId: q.id,
-          text: q.text,
-          options: applyOptionOrder(q.options, pending.optionOrder),
-          timeLimitMs: QUIZ.TIME_LIMIT_MS,
-        },
-      };
-    }
-
-    const position = served.length + 1;
-    if (position > QUIZ.QUESTION_COUNT) return { ok: true, value: null };
-
-    const questionId = attempt.questionIds[position - 1];
-    const q = await loadQuestion(tx, questionId);
-    if (!q) return fail('Асуулт олдсонгүй');
-
-    const rng = mulberry32(attempt.seed + position);
-    const optionOrder = buildOptionOrder(q.options.length, rng);
-
-    await tx.insert(attemptAnswers).values({
-      attemptId, questionId, position, optionOrder, servedAt: new Date(),
-    });
-
-    return {
-      ok: true,
-      value: {
-        position,
-        total: QUIZ.QUESTION_COUNT,
-        questionId: q.id,
-        text: q.text,
-        options: applyOptionOrder(q.options, optionOrder),
-        timeLimitMs: QUIZ.TIME_LIMIT_MS,
-      },
-    };
-  });
-}
-
-async function loadQuestion(exec: Exec, id: number) {
-  const [q] = await exec.select().from(questions).where(eq(questions.id, id)).limit(1);
-  return q ?? null;
-}
-
-export async function submitAnswer(
-  attemptId: string,
-  questionId: number,
-  shownIndex: number,
-): Promise<Result<{ isCorrect: boolean; points: number }>> {
-  // submitAnswer нь зөвхөн attempts болон attempt_answers хүснэгтэд хандана,
-  // registrations-д огт хүрэхгүй тул "registrations ЭХЭЛЖ, дараа нь attempts — ЯМАГТ"
-  // гэсэн (startAttempt/finishAttempt/serveNextQuestion-ийн) түгжээний дарааллыг
-  // эвдэх эрсдэлгүй.
-  //
-  // Бүх шийдвэрийг нэг гүйлгээнд, тухайн attempt мөрийг FOR UPDATE-ээр түгжсэн
-  // байдлаар гүйцэтгэнэ. Ингэснээр нэг асуултад зэрэг ирсэн submitAnswer хүсэлтүүд
-  // дараалж, зөвхөн нэг нь оноо тооцож бичнэ — бусад нь (түгжээ суллагдсаны дараа
-  // answeredAt аль хэдийн тавигдсаныг хараад) "аль хэдийн хариулсан" гэсэн алдаа
-  // буцаана, isCorrect тооцохгүй. Үгүй бол энэ зам "хариулт оракул" болж, зэрэг
-  // ирсэн олон хүсэлт бүр өөрийн isCorrect-ийг хүлээн авч зөв хариултыг илрүүлэх
-  // боломжтой болдог байв.
-  return db.transaction(async (tx) => {
-    const [attempt] = await tx.select().from(attempts)
-      .where(eq(attempts.id, attemptId)).for('update').limit(1);
-    if (!attempt) return fail('Оролдлого олдсонгүй');
-    if (attempt.status !== 'in_progress') return fail('Энэ оролдлого дууссан байна');
-
-    // attempts мөрийг түгжсэний дараа attempt_answers мөрийг дахин уншиж,
-    // "хариулаагүй" төлөвийг хамгийн сүүлийн үнэн эх сурвалжаас баталгаажуулна.
-    const [row] = await tx.select().from(attemptAnswers)
-      .where(and(
-        eq(attemptAnswers.attemptId, attemptId),
-        eq(attemptAnswers.questionId, questionId),
-        isNull(attemptAnswers.answeredAt),
-      )).limit(1);
-    if (!row) return fail('Энэ асуулт өгөгдөөгүй эсвэл аль хэдийн хариулсан байна');
-
-    const q = await loadQuestion(tx, questionId);
-    if (!q) return fail('Асуулт олдсонгүй');
-
-    const answeredAt = new Date();
-    const elapsedMs = answeredAt.getTime() - row.servedAt.getTime();
-    const originalIndex = resolveChoice(row.optionOrder, shownIndex);
-    const isCorrect = originalIndex === q.correctIndex;
-    const points = scoreAnswer(isCorrect, elapsedMs);
-
-    await tx.update(attemptAnswers)
-      .set({ answeredAt, choiceIndex: originalIndex, isCorrect, points })
-      .where(eq(attemptAnswers.id, row.id));
-
-    return { ok: true, value: { isCorrect, points } };
-  });
-}
-
-/** Phase 2-ын гурван шинэ тоглоом (P2-3). */
+/** Гурван тоглоом. */
 export type GameName = 'sort' | 'stack' | 'memo';
 
 /** Олон шалтгаан хуримтлагдаж болох тул хоосон бол шинээр, үгүй бол "; "-ээр залгана. */
@@ -496,7 +341,6 @@ export async function submitMemo(
 
 export async function finishAttempt(attemptId: string): Promise<Result<{
   totalScore: number;
-  quizScore: number;
   sortScore: number;
   stackScore: number;
   memoScore: number;
@@ -528,15 +372,12 @@ export async function finishAttempt(attemptId: string): Promise<Result<{
     if (!attempt) return fail('Оролдлого олдсонгүй');
     if (attempt.status !== 'in_progress') return fail('Энэ оролдлого аль хэдийн дууссан байна');
 
-    const answers = await tx.select({ points: attemptAnswers.points }).from(attemptAnswers)
-      .where(eq(attemptAnswers.attemptId, attemptId));
-    const quizScore = answers.reduce((sum, a) => sum + a.points, 0);
-    // Phase 2: totalScore = quiz + sort + stack + memo (reaction тоглоом устгагдсан).
-    const total = totalScore(quizScore, attempt.sortScore, attempt.stackScore, attempt.memoScore);
+    // totalScore = sort + stack + memo. Асуултын тоглоом хасагдсан.
+    const total = totalScore(attempt.sortScore, attempt.stackScore, attempt.memoScore);
     const finishedAt = new Date();
 
     await tx.update(attempts).set({
-      status: 'completed', quizScore, totalScore: total, finishedAt,
+      status: 'completed', totalScore: total, finishedAt,
     }).where(eq(attempts.id, attemptId));
 
     let bestScore = reg.bestScore;
@@ -551,7 +392,6 @@ export async function finishAttempt(attemptId: string): Promise<Result<{
       ok: true,
       value: {
         totalScore: total,
-        quizScore,
         sortScore: attempt.sortScore,
         stackScore: attempt.stackScore,
         memoScore: attempt.memoScore,

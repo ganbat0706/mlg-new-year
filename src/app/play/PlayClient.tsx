@@ -7,7 +7,6 @@ import { loadSession } from '@/lib/session';
 import { saveLastFinish, type FinishPayload } from '@/lib/finish';
 import { Button } from '@/components/Button';
 import { Loader } from '@/components/Loader';
-import { QuizStage } from './QuizStage';
 import { SortStage } from './SortStage';
 import { StackStage } from './StackStage';
 import { MemoStage } from './MemoStage';
@@ -19,7 +18,6 @@ type StartData = {
   sortSchedule: SortItem[];
   stackSchedule: StackLevel[];
   memoSchedule: number[];
-  answered: number;
   sortDone: boolean;
   stackDone: boolean;
   memoDone: boolean;
@@ -27,9 +25,9 @@ type StartData = {
 
 type Progress = { sort: boolean; stack: boolean; memo: boolean };
 
-type Stage = 'loading' | 'quiz' | 'sort' | 'stack' | 'memo' | 'finishing' | 'error';
+type Stage = 'loading' | 'sort' | 'stack' | 'memo' | 'finishing' | 'error';
 
-/** Эхлэх дэс дараа нь: Асуулт → Зөв зам → Контейнер овоолох → Хос манифест → finish. */
+/** Эхлэх дэс дараа нь: Зөв зам → Контейнер овоолох → Хос манифест → finish. */
 function firstUnfinished(p: Progress): Stage {
   if (!p.sort) return 'sort';
   if (!p.stack) return 'stack';
@@ -60,9 +58,12 @@ export function PlayClient() {
         stack: res.data.stackDone,
         memo: res.data.memoDone,
       });
-      // Асуулт үе шатыг үргэлж эхэлнэ — хэрэв бүгдийг нь хариулсан бол
-      // QuizStage серверээс null асуулт хүлээж аваад шууд onDone дуудна.
-      setStage('quiz');
+      // Дуусаагүй эхний тоглоомоос эхэлнэ (оролдлогоо завсарлаад буцаж ирсэн
+      // тохиолдолд дууссан тоглоомыг давтахгүй).
+      const ns = firstUnfinished({
+        sort: res.data.sortDone, stack: res.data.stackDone, memo: res.data.memoDone,
+      });
+      setStage(ns === 'finishing' ? 'sort' : ns);
     })();
   }, [router]);
 
@@ -103,20 +104,6 @@ export function PlayClient() {
   }
 
   if (!start) return null;
-
-  if (stage === 'quiz') {
-    return (
-      <QuizStage
-        attemptId={start.attemptId}
-        onDone={() => {
-          const ns = firstUnfinished(progress);
-          if (ns === 'finishing') void finishAndGo();
-          else setStage(ns);
-        }}
-        onError={(m) => { setError(m); setStage('error'); }}
-      />
-    );
-  }
 
   if (stage === 'sort') {
     return (

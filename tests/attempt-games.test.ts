@@ -3,7 +3,7 @@ import {
   startAttempt, beginGame, submitSort, submitStack, submitMemo, finishAttempt,
 } from '@/lib/repo/attempts';
 import { registerOrGet } from '@/lib/repo/registrations';
-import { resetDb, seedQuestions } from './helpers/db';
+import { resetDb } from './helpers/db';
 import { SORT, STACK, MEMO, PLAY } from '@/lib/config';
 import { db } from '@/lib/db';
 import { attempts } from '@/lib/db/schema';
@@ -92,7 +92,6 @@ function playMemoAllCorrectly(schedule: readonly number[]): { card: number; t: n
 
 beforeEach(async () => {
   await resetDb();
-  await seedQuestions(15);
 });
 
 describe('beginGame', () => {
@@ -314,7 +313,7 @@ describe('гурван тоглоомын зэрэгцээ (concurrency) submit 
 });
 
 describe('finishAttempt — Phase 2 нийт оноо', () => {
-  it('totalScore = quiz + sort + stack + memo', async () => {
+  it('totalScore = sort + stack + memo', async () => {
     const a = await freshAttempt();
 
     await backdateStart(a.attemptId, 'sortStartedAt', SORT.DURATION_MS);
@@ -337,7 +336,7 @@ describe('finishAttempt — Phase 2 нийт оноо', () => {
     expect(r.value.stackScore).toBe(stackResult.value.score);
     expect(r.value.memoScore).toBe(memoResult.value.score);
     expect(r.value.totalScore).toBe(
-      r.value.quizScore + sortResult.value.score + stackResult.value.score + memoResult.value.score,
+      sortResult.value.score + stackResult.value.score + memoResult.value.score,
     );
     // flagged — memo "perfect" тул энэ оролдлого flag-тай дуусна.
     expect(r.value.flagged).toBe(true);

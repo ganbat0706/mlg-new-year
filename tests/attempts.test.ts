@@ -1,13 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  startAttempt, serveNextQuestion, submitAnswer, finishAttempt,
-} from '@/lib/repo/attempts';
+import { startAttempt, finishAttempt } from '@/lib/repo/attempts';
 import { registerOrGet } from '@/lib/repo/registrations';
-import { resetDb, seedQuestions } from './helpers/db';
-import { QUIZ, GAME } from '@/lib/config';
+import { resetDb } from './helpers/db';
+import { GAME } from '@/lib/config';
 import { db } from '@/lib/db';
-import { attempts, attemptAnswers, registrations } from '@/lib/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { attempts, registrations } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 const input = {
   lastName: 'батхүү', firstName: 'ганбат',
@@ -22,7 +20,6 @@ async function newRegistration(phone = '88112233') {
 
 beforeEach(async () => {
   await resetDb();
-  await seedQuestions(15);
 });
 
 describe('startAttempt', () => {
@@ -34,7 +31,6 @@ describe('startAttempt', () => {
     expect(r.value.sortSchedule.length).toBe(12);
     expect(r.value.stackSchedule.length).toBe(6);
     expect(r.value.memoSchedule.length).toBe(12);
-    expect(r.value.answered).toBe(0);
     expect(r.value.sortDone).toBe(false);
     expect(r.value.stackDone).toBe(false);
     expect(r.value.memoDone).toBe(false);
@@ -47,17 +43,6 @@ describe('startAttempt', () => {
     expect(a.ok && b.ok && a.value.attemptId).toBe(b.ok ? b.value.attemptId : '');
   });
 
-  it('оролдлого үргэлжлүүлэхэд хариулсан тоо хадгалагдана', async () => {
-    const reg = await newRegistration();
-    const a = await startAttempt(reg.id);
-    if (!a.ok) throw new Error('эхлээгүй');
-    const q = await serveNextQuestion(a.value.attemptId);
-    if (!q.ok || !q.value) throw new Error('асуулт ирсэнгүй');
-    await submitAnswer(a.value.attemptId, q.value.questionId, 0);
-
-    const b = await startAttempt(reg.id);
-    expect(b.ok && b.value.answered).toBe(1);
-  });
 
   it('30 минутаас удсан оролдлого хүчингүй болж, оролдлогын тоонд тооцогдохгүй', async () => {
     const reg = await newRegistration();
@@ -143,249 +128,27 @@ describe('startAttempt - зэрэгцээ (concurrency)', () => {
   });
 });
 
-describe('serveNextQuestion', () => {
-  it(`${QUIZ.QUESTION_COUNT} асуулт дараалан өгнө, дараа нь null`, async () => {
-    const reg = await newRegistration();
-    const a = await startAttempt(reg.id);
-    if (!a.ok) throw new Error(a.error);
-
-    for (let i = 1; i <= QUIZ.QUESTION_COUNT; i++) {
-      const q = await serveNextQuestion(a.value.attemptId);
-      expect(q.ok).toBe(true);
-      if (!q.ok || !q.value) throw new Error(`${i}-р асуулт ирсэнгүй`);
-      expect(q.value.position).toBe(i);
-      expect(q.value.total).toBe(QUIZ.QUESTION_COUNT);
-      expect(q.value.options).toHaveLength(4);
-      await submitAnswer(a.value.attemptId, q.value.questionId, 0);
-    }
-
-    const extra = await serveNextQuestion(a.value.attemptId);
-    expect(extra.ok && extra.value).toBeNull();
-  });
-
-  it('хариулаагүй байхад дахин дуудвал ижил асуулт буцаана', async () => {
-    const reg = await newRegistration();
-    const a = await startAttempt(reg.id);
-    if (!a.ok) throw new Error(a.error);
-    const first = await serveNextQuestion(a.value.attemptId);
-    const again = await serveNextQuestion(a.value.attemptId);
-    expect(first.ok && again.ok && first.value?.questionId)
-      .toBe(again.ok ? again.value?.questionId : -1);
-  });
-
-  it('зөв хариултыг хариултанд оруулж илгээхгүй', async () => {
-    const reg = await newRegistration();
-    const a = await startAttempt(reg.id);
-    if (!a.ok) throw new Error(a.error);
-    const q = await serveNextQuestion(a.value.attemptId);
-    if (!q.ok || !q.value) throw new Error('асуулт алга');
-    expect(JSON.stringify(q.value)).not.toContain('correctIndex');
-    expect(JSON.stringify(q.value)).not.toContain('correct_index');
-  });
-
-  it('асуултууд давхардахгүй', async () => {
-    const reg = await newRegistration();
-    const a = await startAttempt(reg.id);
-    if (!a.ok) throw new Error(a.error);
-    const ids: number[] = [];
-    for (let i = 0; i < QUIZ.QUESTION_COUNT; i++) {
-      const q = await serveNextQuestion(a.value.attemptId);
-      if (!q.ok || !q.value) break;
-      ids.push(q.value.questionId);
-      await submitAnswer(a.value.attemptId, q.value.questionId, 0);
-    }
-    expect(new Set(ids).size).toBe(QUIZ.QUESTION_COUNT);
-  });
-});
-
-describe('serveNextQuestion - зэрэгцээ (concurrency)', () => {
-  it('нэг оролдлогод зэрэг ирсэн 5 хүсэлт яг нэг л асуулт үүсгэнэ', async () => {
-    const reg = await newRegistration();
-    const a = await startAttempt(reg.id);
-    if (!a.ok) throw new Error(a.error);
-
-    for (let round = 1; round <= QUIZ.QUESTION_COUNT; round++) {
-      const results = await Promise.all(
-        Array.from({ length: 5 }, () => serveNextQuestion(a.value.attemptId)),
-      );
-      for (const r of results) expect(r.ok).toBe(true);
-
-      const questionIds = new Set(results.map((r) => (r.ok && r.value ? r.value.questionId : -1)));
-      const positions = new Set(results.map((r) => (r.ok && r.value ? r.value.position : -1)));
-      expect(questionIds.size).toBe(1); // бүгд ижил questionId буцаасан
-      expect(positions.size).toBe(1); // бүгд ижил position буцаасан
-      expect([...positions][0]).toBe(round);
-
-      const rows = await db.select().from(attemptAnswers)
-        .where(eq(attemptAnswers.attemptId, a.value.attemptId));
-      expect(rows.length).toBe(round); // давхар INSERT хийгдээгүй — яг round мөр
-
-      const first = results.find((r) => r.ok && r.value);
-      if (!first || !first.ok || !first.value) throw new Error('асуулт алга');
-      await submitAnswer(a.value.attemptId, first.value.questionId, 0);
-    }
-
-    const finalRows = await db.select().from(attemptAnswers)
-      .where(eq(attemptAnswers.attemptId, a.value.attemptId));
-    expect(finalRows.length).toBe(QUIZ.QUESTION_COUNT); // нийт яг QUESTION_COUNT мөр, илүүгүй
-
-    const extra = await serveNextQuestion(a.value.attemptId);
-    expect(extra.ok && extra.value).toBeNull();
-  });
-});
-
-describe('submitAnswer', () => {
-  it('зөв хариултад оноо өгнө', async () => {
-    const reg = await newRegistration();
-    const a = await startAttempt(reg.id);
-    if (!a.ok) throw new Error(a.error);
-    const q = await serveNextQuestion(a.value.attemptId);
-    if (!q.ok || !q.value) throw new Error('асуулт алга');
-
-    // seedQuestions: correct_index = id % 4, options нь ['A','B','C','D']
-    // Зөв хувилбарын ТЕКСТийг олж, түүний харагдсан байрлалыг илгээнэ.
-    const correctLetter = ['A', 'B', 'C', 'D'][q.value.questionId % 4];
-    const shownIndex = q.value.options.indexOf(correctLetter);
-
-    const r = await submitAnswer(a.value.attemptId, q.value.questionId, shownIndex);
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.value.isCorrect).toBe(true);
-    expect(r.value.points).toBeGreaterThan(0);
-  });
-
-  it('буруу хариултад 0 оноо', async () => {
-    const reg = await newRegistration();
-    const a = await startAttempt(reg.id);
-    if (!a.ok) throw new Error(a.error);
-    const q = await serveNextQuestion(a.value.attemptId);
-    if (!q.ok || !q.value) throw new Error('асуулт алга');
-
-    const correctLetter = ['A', 'B', 'C', 'D'][q.value.questionId % 4];
-    const wrongIndex = q.value.options.findIndex((o) => o !== correctLetter);
-
-    const r = await submitAnswer(a.value.attemptId, q.value.questionId, wrongIndex);
-    expect(r.ok && r.value.isCorrect).toBe(false);
-    expect(r.ok && r.value.points).toBe(0);
-  });
-
-  it('нэг асуултад давхар хариулахыг татгалзана', async () => {
-    const reg = await newRegistration();
-    const a = await startAttempt(reg.id);
-    if (!a.ok) throw new Error(a.error);
-    const q = await serveNextQuestion(a.value.attemptId);
-    if (!q.ok || !q.value) throw new Error('асуулт алга');
-
-    await submitAnswer(a.value.attemptId, q.value.questionId, 0);
-    const second = await submitAnswer(a.value.attemptId, q.value.questionId, 1);
-    expect(second.ok).toBe(false);
-  });
-
-  it('өгөгдөөгүй асуултад хариулахыг татгалзана', async () => {
-    const reg = await newRegistration();
-    const a = await startAttempt(reg.id);
-    if (!a.ok) throw new Error(a.error);
-    await serveNextQuestion(a.value.attemptId);
-    const r = await submitAnswer(a.value.attemptId, 99999, 0);
-    expect(r.ok).toBe(false);
-  });
-
-  it('хүрээнээс гадуур сонголт буруу гэж тооцогдоно', async () => {
-    const reg = await newRegistration();
-    const a = await startAttempt(reg.id);
-    if (!a.ok) throw new Error(a.error);
-    const q = await serveNextQuestion(a.value.attemptId);
-    if (!q.ok || !q.value) throw new Error('асуулт алга');
-    const r = await submitAnswer(a.value.attemptId, q.value.questionId, 99);
-    expect(r.ok && r.value.isCorrect).toBe(false);
-    expect(r.ok && r.value.points).toBe(0);
-  });
-});
-
-describe('submitAnswer - зэрэгцээ (concurrency)', () => {
-  // submitAnswer одоо attempts мөрийг FOR UPDATE-ээр түгжиж, нэг гүйлгээн дотор
-  // ажилладаг тул нэг асуултад зэрэг ирсэн хариултуудаас ЗӨВХӨН НЭГ нь амжилттай
-  // болж, бусад нь (түгжээ суллагдсаны дараа answeredAt аль хэдийн тавигдсаныг
-  // хараад) "аль хэдийн хариулсан" гэж татгалзана. Чухал нь: татгалзсан хариулт
-  // isCorrect-ийг ил гаргахгүй — үгүй бол зэрэг ирсэн олон хүсэлт бүр өөрийн
-  // isCorrect-ийг хүлээн авч зөв хариултыг илрүүлэх "оракул" болдог байсан (нэг
-  // асуулт, олон оролдлого → зөв хувилбарыг таамаглалгүй олох боломж).
-  it('нэг асуултад зэрэг ирсэн хариултуудаас зөвхөн нэг амжилттай болж, isCorrect ил гарахгүй', async () => {
-    const reg = await newRegistration();
-    const a = await startAttempt(reg.id);
-    if (!a.ok) throw new Error(a.error);
-    const q = await serveNextQuestion(a.value.attemptId);
-    if (!q.ok || !q.value) throw new Error('асуулт алга');
-
-    const correctLetter = ['A', 'B', 'C', 'D'][q.value.questionId % 4];
-    const shownIndex = q.value.options.indexOf(correctLetter);
-    const { questionId } = q.value;
-
-    const results = await Promise.all(
-      Array.from({ length: 5 }, () => submitAnswer(a.value.attemptId, questionId, shownIndex)),
-    );
-
-    const succeeded = results.filter((r) => r.ok);
-    const failed = results.filter((r) => !r.ok);
-    expect(succeeded.length).toBe(1); // яг нэг л амжилттай
-    expect(failed.length).toBe(4); // бусад дөрвөөс бүгд татгалзсан
-
-    // Татгалзсан хариултууд isCorrect (эсвэл ямар ч оноо/зөв мэдээлэл) агуулахгүй —
-    // "хариулт оракул" хаагдсан эсэхийг шалгана.
-    for (const r of failed) {
-      expect(r).not.toHaveProperty('value');
-      expect(JSON.stringify(r)).not.toContain('isCorrect');
-    }
-
-    const rows = await db.select().from(attemptAnswers)
-      .where(and(
-        eq(attemptAnswers.attemptId, a.value.attemptId),
-        eq(attemptAnswers.questionId, questionId),
-      ));
-    expect(rows.length).toBe(1); // нэг л мөр — давхар INSERT хийгдээгүй
-    expect(rows[0].answeredAt).not.toBeNull(); // яг нэг мөр answeredAt-тай болсон
-
-    // Хадгалагдсан points нь амжилттай болсон цорын ганц хариултын буцаасан
-    // points-той яг таарна — сүүлд бичсэн нь санамсаргүй ялгаатай оноогоор
-    // дарагдаагүй.
-    const [succeededResult] = succeeded;
-    if (succeededResult.ok) {
-      expect(rows[0].points).toBe(succeededResult.value.points);
-      expect(rows[0].isCorrect).toBe(succeededResult.value.isCorrect);
-    }
-
-    const finish = await finishAttempt(a.value.attemptId);
-    expect(finish.ok).toBe(true);
-    if (!finish.ok) return;
-    // Нэг асуултын боломжит дээд онооноос (хурдны урамшуулал орсон ч) хэтрэхгүй.
-    expect(finish.value.quizScore).toBeLessThanOrEqual(
-      QUIZ.BASE_POINTS + (QUIZ.TIME_LIMIT_MS / 1000) * QUIZ.SPEED_POINTS_PER_SECOND,
-    );
-  });
-});
-
 describe('finishAttempt', () => {
   it('нийт оноог тооцож бүртгэлийн дээд оноог шинэчилнэ', async () => {
     const reg = await newRegistration();
     const a = await startAttempt(reg.id);
     if (!a.ok) throw new Error(a.error);
 
-    for (let i = 0; i < QUIZ.QUESTION_COUNT; i++) {
-      const q = await serveNextQuestion(a.value.attemptId);
-      if (!q.ok || !q.value) break;
-      const correctLetter = ['A', 'B', 'C', 'D'][q.value.questionId % 4];
-      await submitAnswer(a.value.attemptId, q.value.questionId, q.value.options.indexOf(correctLetter));
-    }
+    // Тоглоомын онооны нийлбэрийг шалгах нь энд зорилго тул гурван тоглоомын
+    // оноог шууд бичиж (тэдгээрийн өөрсдийн шалгалт attempt-games.test.ts-д байна)
+    // finishAttempt НИЙЛБЭР зөв гаргаж байгааг тусад нь баталгаажуулна.
+    await db.update(attempts)
+      .set({ sortScore: 800, stackScore: 600, memoScore: 400 })
+      .where(eq(attempts.id, a.value.attemptId));
 
     const r = await finishAttempt(a.value.attemptId);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value.quizScore).toBeGreaterThan(0);
-    expect(r.value.sortScore).toBe(0);
-    expect(r.value.stackScore).toBe(0);
-    expect(r.value.memoScore).toBe(0);
-    expect(r.value.totalScore).toBe(r.value.quizScore);
-    expect(r.value.bestScore).toBe(r.value.totalScore);
+    expect(r.value.sortScore).toBe(800);
+    expect(r.value.stackScore).toBe(600);
+    expect(r.value.memoScore).toBe(400);
+    expect(r.value.totalScore).toBe(1800);
+    expect(r.value.bestScore).toBe(1800);
   });
 
   it('хоёр дахь оролдлого муу бол дээд оноо буурахгүй', async () => {
@@ -393,12 +156,9 @@ describe('finishAttempt', () => {
 
     const first = await startAttempt(reg.id);
     if (!first.ok) throw new Error(first.error);
-    for (let i = 0; i < QUIZ.QUESTION_COUNT; i++) {
-      const q = await serveNextQuestion(first.value.attemptId);
-      if (!q.ok || !q.value) break;
-      const correctLetter = ['A', 'B', 'C', 'D'][q.value.questionId % 4];
-      await submitAnswer(first.value.attemptId, q.value.questionId, q.value.options.indexOf(correctLetter));
-    }
+    await db.update(attempts)
+      .set({ sortScore: 900, stackScore: 500, memoScore: 300 })
+      .where(eq(attempts.id, first.value.attemptId));
     const r1 = await finishAttempt(first.value.attemptId);
 
     const second = await startAttempt(reg.id);

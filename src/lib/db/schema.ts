@@ -1,5 +1,5 @@
 import {
-  pgTable, uuid, text, integer, boolean, timestamp, jsonb, serial, index,
+  pgTable, uuid, text, integer, boolean, timestamp, index,
 } from 'drizzle-orm/pg-core';
 
 export const registrations = pgTable('registrations', {
@@ -16,22 +16,12 @@ export const registrations = pgTable('registrations', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('registrations_best_score_idx').on(t.bestScore)]);
 
-export const questions = pgTable('questions', {
-  id: serial('id').primaryKey(),
-  text: text('text').notNull(),
-  options: jsonb('options').$type<string[]>().notNull(),
-  correctIndex: integer('correct_index').notNull(),
-  active: boolean('active').notNull().default(true),
-});
-
 export const attempts = pgTable('attempts', {
   id: uuid('id').primaryKey().defaultRandom(),
   registrationId: uuid('registration_id').notNull().references(() => registrations.id),
   status: text('status').$type<'in_progress' | 'completed' | 'invalid'>().notNull().default('in_progress'),
   seed: integer('seed').notNull(),
-  questionIds: jsonb('question_ids').$type<number[]>().notNull(),
-  quizScore: integer('quiz_score').notNull().default(0),
-  // Phase 2 — гурван шинэ тоглоом (P2-1).
+  // Гурван тоглоом — Зөв зам, Контейнер овоолох, Хос манифест.
   sortScore: integer('sort_score').notNull().default(0),
   stackScore: integer('stack_score').notNull().default(0),
   memoScore: integer('memo_score').notNull().default(0),
@@ -51,16 +41,3 @@ export const attempts = pgTable('attempts', {
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp('finished_at', { withTimezone: true }),
 }, (t) => [index('attempts_registration_idx').on(t.registrationId)]);
-
-export const attemptAnswers = pgTable('attempt_answers', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  attemptId: uuid('attempt_id').notNull().references(() => attempts.id),
-  questionId: integer('question_id').notNull().references(() => questions.id),
-  position: integer('position').notNull(),
-  optionOrder: jsonb('option_order').$type<number[]>().notNull(),
-  servedAt: timestamp('served_at', { withTimezone: true }).notNull().defaultNow(),
-  answeredAt: timestamp('answered_at', { withTimezone: true }),
-  choiceIndex: integer('choice_index'),
-  isCorrect: boolean('is_correct'),
-  points: integer('points').notNull().default(0),
-}, (t) => [index('attempt_answers_attempt_idx').on(t.attemptId)]);

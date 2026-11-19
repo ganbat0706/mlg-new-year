@@ -15,7 +15,6 @@
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:setup": "tsx scripts/db-setup.ts",
-    "seed": "tsx scripts/seed-questions.ts",
     "fonts": "node scripts/fetch-fonts.mjs"
   },
   "dependencies": {

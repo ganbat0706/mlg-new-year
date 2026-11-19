@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import {
-  isGameOpen, QUIZ, SORT, STACK, MEMO, GAME,
+  isGameOpen, SORT, STACK, MEMO, GAME,
 } from '@/lib/config';
 import { Brand } from '@/components/Brand';
 
@@ -17,33 +17,26 @@ export default function RulesPage() {
 
       <ol className="enter mt-8 space-y-6">
         <li>
-          <h2 className="text-lg font-bold">1. Асуулт — {QUIZ.QUESTION_COUNT} ширхэг</h2>
-          <p className="mt-1.5 text-base leading-relaxed text-[#6B6568]">
-            Асуулт тус бүрт {QUIZ.TIME_LIMIT_MS / 1000} секунд. Хурдан хариулах тусам
-            илүү оноо. Хугацаа дуусвал дараагийн асуулт руу автоматаар шилжинэ.
-          </p>
-        </li>
-        <li>
-          <h2 className="text-lg font-bold">2. Зөв зам — {SORT.DURATION_MS / 1000} секунд</h2>
+          <h2 className="text-lg font-bold">1. Зөв зам — {SORT.DURATION_MS / 1000} секунд</h2>
           <p className="mt-1.5 text-base leading-relaxed text-[#6B6568]">
             Ачааг зөв тээврийн хэрэгсэл рүү (төмөр зам, авто, агаар) чиглүүлнэ,
             эвдэрсэн ачааг буцаана.
           </p>
         </li>
         <li>
-          <h2 className="text-lg font-bold">3. Контейнер овоолох — {STACK.DURATION_MS / 1000} секунд</h2>
+          <h2 className="text-lg font-bold">2. Контейнер овоолох — {STACK.DURATION_MS / 1000} секунд</h2>
           <p className="mt-1.5 text-base leading-relaxed text-[#6B6568]">
             Савалж буй контейнерийг өмнөх овоолгын төвд тааруулан буулгана.
           </p>
         </li>
         <li>
-          <h2 className="text-lg font-bold">4. Хос манифест — {MEMO.DURATION_MS / 1000} секунд</h2>
+          <h2 className="text-lg font-bold">3. Хос манифест — {MEMO.DURATION_MS / 1000} секунд</h2>
           <p className="mt-1.5 text-base leading-relaxed text-[#6B6568]">
             Нуугдсан хос контейнерийг санаж олно. Хурдан дуусгах тусам урамшуулал.
           </p>
         </li>
         <li>
-          <h2 className="text-lg font-bold">5. Оролдлого — {GAME.MAX_ATTEMPTS} удаа</h2>
+          <h2 className="text-lg font-bold">4. Оролдлого — {GAME.MAX_ATTEMPTS} удаа</h2>
           <p className="mt-1.5 text-base leading-relaxed text-[#6B6568]">
             Хамгийн сайн оноо тооцогдоно. Эхний {GAME.PRIZE_PLACES} байр шагналтай.
           </p>

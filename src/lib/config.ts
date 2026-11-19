@@ -1,12 +1,3 @@
-export const QUIZ = {
-  QUESTION_COUNT: 10,
-  TIME_LIMIT_MS: 10_000,
-  /** Сүлжээний саатлыг нөхөх хөнгөлөлт — серверийн хэмжсэн хугацаанаас хасна. */
-  NETWORK_GRACE_MS: 800,
-  BASE_POINTS: 100,
-  SPEED_POINTS_PER_SECOND: 10,
-} as const;
-
 /** 1. Зөв зам — контейнер зөв чиглэлд ангилах тоглоом. Дээд оноо: 12 × 80 = 960. */
 export const SORT = {
   DURATION_MS: 15_000,

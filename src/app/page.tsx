@@ -36,7 +36,6 @@ export default function Home() {
         </p>
 
         <ul className="enter enter-delay-3 mt-8 space-y-2 text-base text-[#6B6568]">
-          <li>· 10 асуулт — асуулт тус бүр 10 секунд</li>
           <li>· Зөв зам · Контейнер овоолох · Хос манифест — 3 богино тоглоом</li>
           <li>· 3 удаа оролдож болно, хамгийн сайн оноо тооцогдоно</li>
         </ul>

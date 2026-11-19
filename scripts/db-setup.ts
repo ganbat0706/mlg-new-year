@@ -22,29 +22,9 @@ export async function ensureOneOpenAttemptIndex(): Promise<void> {
     WHERE status = 'in_progress';
   `;
 }
-
-/**
- * Нэг оролдлогод нэг байрлалд (position) болон нэг асуултад (question_id) зөвхөн
- * нэг мөр байж болно гэдгийг санг түвшинд баталгаажуулна (Task 7 — serveNextQuestion-ий
- * concurrency fix). Аппликейшны логик (FOR UPDATE түгжээ) давхар хамгаалалт өгдөг ч
- * ирээдүйд дахин зохион бүтээхэд энэ индексүүд нь сүүлчийн бат бэх хамгаалалт болно.
- * Хэдэн ч удаа ажиллуулахад аюулгүй (IF NOT EXISTS).
- */
-export async function ensureAttemptAnswerUniqueness(): Promise<void> {
-  await client`
-    CREATE UNIQUE INDEX IF NOT EXISTS attempt_answers_attempt_position_uniq
-    ON attempt_answers (attempt_id, position);
-  `;
-  await client`
-    CREATE UNIQUE INDEX IF NOT EXISTS attempt_answers_attempt_question_uniq
-    ON attempt_answers (attempt_id, question_id);
-  `;
-}
-
 async function main() {
   await ensureInviteSequence();
   await ensureOneOpenAttemptIndex();
-  await ensureAttemptAnswerUniqueness();
 }
 
 if (require.main === module) {
