@@ -11,17 +11,17 @@ export default function RegisterPage() {
   return (
     <main className="mx-auto max-w-xl px-5 pb-28 pt-6">
       <div className="enter"><Brand /></div>
-      <h1 className="enter mt-10 text-3xl font-extrabold tracking-tight">Бүртгэл</h1>
+      <h1 className="enter mt-6 text-3xl font-extrabold tracking-tight">Бүртгэл</h1>
       <p className="enter mt-2 text-base text-[#C9D6E6]">
         Овог нэрээ <strong className="text-[#FAF7F0]">кирилл</strong> үсгээр бичнэ үү.
       </p>
       {/* Маягт бүхэлдээ нэг цаасан хуудсан дээр — илгээмжийн карт шиг. */}
-      <div className="enter sheet mt-8">
+      <div className="enter sheet mt-5">
         <div className="flex items-baseline justify-between">
           <span className="sheet-tag">Ажилтны карт</span>
           <span className="text-xs text-[#6B6568]">№ ______</span>
         </div>
-        <div className="mt-3 mb-5 border-t border-dashed border-[#DAD5CC]" />
+        <div className="mb-4 mt-2.5 border-t border-dashed border-[#DAD5CC]" />
         <RegisterForm />
       </div>
     </main>

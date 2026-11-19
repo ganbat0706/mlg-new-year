@@ -46,22 +46,27 @@ export function RegisterForm() {
     'min-h-12 w-full rounded-lg border border-[#DAD5CC] bg-white px-4 text-base text-[#221E20] ' +
     'outline-none focus:border-[#ED1C24]';
 
+  /*
+    Өргөн дэлгэц дээр хоёр багана: гар утсан дээр (нэг багана) маягт урт
+    болж гүйлгэх нь хэвийн, харин зөөврийн компьютер дээр хажуу тал нь
+    хоосон байтал «Үргэлжлүүлэх» товч нугалаасаас доош унах нь буруу.
+  */
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <form onSubmit={onSubmit} className="grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
       <div>
-        <label htmlFor="lastName" className="mb-1.5 block text-sm font-semibold">Овог</label>
+        <label htmlFor="lastName" className="mb-1 block text-sm font-semibold">Овог</label>
         <input id="lastName" className={field} value={lastName} autoComplete="family-name"
                onChange={(e) => setLastName(e.target.value)} placeholder="Батхүү" required />
       </div>
 
       <div>
-        <label htmlFor="firstName" className="mb-1.5 block text-sm font-semibold">Нэр</label>
+        <label htmlFor="firstName" className="mb-1 block text-sm font-semibold">Нэр</label>
         <input id="firstName" className={field} value={firstName} autoComplete="given-name"
                onChange={(e) => setFirstName(e.target.value)} placeholder="Ганбат" required />
       </div>
 
       <div>
-        <label htmlFor="department" className="mb-1.5 block text-sm font-semibold">Хэлтэс</label>
+        <label htmlFor="department" className="mb-1 block text-sm font-semibold">Хэлтэс</label>
         <select id="department" className={field} value={department} required
                 onChange={(e) => setDepartment(e.target.value)}>
           <option value="">— сонгоно уу —</option>
@@ -70,22 +75,23 @@ export function RegisterForm() {
       </div>
 
       <div>
-        <label htmlFor="phone" className="mb-1.5 block text-sm font-semibold">Утас</label>
+        <label htmlFor="phone" className="mb-1 block text-sm font-semibold">Утас</label>
         <input id="phone" className={field} value={phone} inputMode="numeric"
                autoComplete="tel" maxLength={8} placeholder="88112233"
                onChange={(e) => setPhone(e.target.value)} required />
-        <p className="mt-1.5 text-sm text-[#6B6568]">
-          Нэг дугаараар нэг л удаа бүртгүүлнэ.
-        </p>
       </div>
 
+      <p className="text-sm text-[#6B6568] sm:col-span-2">
+        Нэг дугаараар нэг л удаа бүртгүүлнэ.
+      </p>
+
       {error && (
-        <p role="alert" className="enter-sm rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
+        <p role="alert" className="enter-sm rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15] sm:col-span-2">
           {error}
         </p>
       )}
 
-      <Button type="submit" busy={busy} className="w-full">
+      <Button type="submit" busy={busy} className="w-full sm:col-span-2">
         Үргэлжлүүлэх
       </Button>
     </form>
