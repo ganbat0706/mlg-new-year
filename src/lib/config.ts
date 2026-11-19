@@ -65,6 +65,13 @@ export const DROP = {
   HIT_POINTS: 80,
 } as const;
 
+/**
+ * Дөрвөн тоглоомын дээд оноо. Клиент дээр мөрүүдээс НЭМЖ гаргахгүй —
+ * тоглоом дутуу үлдсэн тохиолдолд «нийт» нь багасаж, тоглогчид буруу
+ * хуваарь харагдана.
+ */
+export const MAX_TOTAL_SCORE = 4 * 960;
+
 export const GAME = {
   MAX_ATTEMPTS: 3,
   PRIZE_PLACES: 5,

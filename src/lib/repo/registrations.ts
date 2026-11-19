@@ -46,6 +46,12 @@ export async function findByPhone(phone: string): Promise<RegistrationView | nul
   return row ? toView(row) : null;
 }
 
+/** Бүртгэлийн id-аар хайна — үр дүнгийн хуудас өөрийн байраа ачаалахад. */
+export async function findById(id: string): Promise<RegistrationView | null> {
+  const [row] = await db.select().from(registrations).where(eq(registrations.id, id)).limit(1);
+  return row ? toView(row) : null;
+}
+
 export async function findByInviteCode(code: string): Promise<RegistrationView | null> {
   const [row] = await db.select().from(registrations).where(eq(registrations.inviteCode, code)).limit(1);
   return row ? toView(row) : null;

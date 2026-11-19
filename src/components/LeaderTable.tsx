@@ -41,7 +41,9 @@ export function LeaderTable({
               <tr
                 key={r.rank}
                 className={`border-t border-[#E3DED2] ${
-                  mine ? 'bg-[#FDECEC] font-semibold' : r.isPrize ? 'bg-[#FFF8E8]' : ''
+                  mine
+                    ? 'bg-[#FFF1C9] font-semibold shadow-[inset_3px_0_0_0_#E8B931]'
+                    : r.isPrize ? 'bg-[#FFF8E8]' : ''
                 }`}
               >
                 <td className="truncate px-3 py-2.5 tabular-nums">

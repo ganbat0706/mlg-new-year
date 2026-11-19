@@ -12,12 +12,17 @@ export default function ResultPage() {
     <main className="mx-auto max-w-2xl px-5 pb-28 pt-6">
       <div className="enter"><Brand /></div>
 
-      <h1 className="enter mt-10 text-3xl font-extrabold tracking-tight">
-        {open ? 'Үр дүн' : 'Тоглоом дууслаа'}
+      {!open && (
+        <p className="enter mt-6 text-xs font-bold uppercase tracking-[0.14em] text-[#E8B931]">
+          Тэмцээн хаагдлаа
+        </p>
+      )}
+      <h1 className={`enter text-3xl font-extrabold tracking-tight ${open ? 'mt-6' : 'mt-1'}`}>
+        {open ? 'Үр дүн' : 'Эцсийн үр дүн'}
       </h1>
 
       {!open && (
-        <p className="enter sheet mt-3 text-base">
+        <p className="enter mt-2 text-base text-[#C9D6E6]">
           Тэмцээн хаагдлаа. Арга хэмжээ <strong>{event.date}</strong>
           {event.time ? ` · ${event.time}` : ''}
           {event.venue ? ` · ${event.venue}` : ''} болно.

@@ -549,3 +549,21 @@ html[data-stage="running"] .bulb {
 :where(.bg-white) {
   color: var(--color-ink);
 }
+
+/* Шөнө дээрх хоёрдогч товч — тунгалаг, хүйтэн хүрээтэй. */
+.btn-night-ghost {
+  color: var(--color-paper);
+  border: 1px solid rgba(201, 214, 230, .45);
+  background: transparent;
+}
+.btn-night-ghost:hover { background: rgba(201, 214, 230, .12); }
+
+/* Онооны хэмжүүрийн дүүргэлт — зүүнээс баруун тийш. */
+@keyframes meter-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.meter-fill {
+  transform-origin: left center;
+  animation: meter-fill 420ms var(--land) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .meter-fill { animation: none; transform: none; }
+}

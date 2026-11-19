@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import type { FinishPayload } from '@/lib/finish';
+import { GAME, MAX_TOTAL_SCORE } from '@/lib/config';
 import { audio } from '@/lib/audio';
 
 /**
@@ -10,6 +10,9 @@ import { audio } from '@/lib/audio';
  * хөдөлгөөний мөч (урлагийн чиглэл, 4-р хэсэг). `PlayClient` `finishAttempt`-ийн
  * хариуг хадгалдаг тул энд НЭГ УДАА харуулж, тоглогч оноогоо "буухыг" харна.
  */
+
+/** Тоглоом бүрийн дээд оноо тэнцүү (960) — шугам нь ижил хуваарьтай. */
+const PER_GAME_MAX = MAX_TOTAL_SCORE / 4;
 
 const ROWS = (d: FinishPayload) => [
   { label: 'Зөв зам', score: d.sortScore },
@@ -32,13 +35,27 @@ function bezierY(x: number, p1x: number, p1y: number, p2x: number, p2y: number):
   return by(t);
 }
 
-const CONFETTI_COLORS = ['#ED1C24', '#E8B931', '#221E20', '#FFFFFF'];
-const CONFETTI = Array.from({ length: 24 }, (_, i) => ({
-  left: (i * 37) % 100,
-  rotate: (i * 53) % 360,
-  color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-  delay: (i % 6) * 15,
-}));
+/**
+ * Confetti-гийн өнгө. ЦАГААН БАЙХГҮЙ: карт нь #FAF7F0 цаас тул цагаан
+ * хэсгүүд 1.03:1 контрасттай буюу огт харагддаггүй байв (24-өөс 6 нь).
+ * Оронд нь шөнийн цэнхэр — цаасан дээр 11.6:1.
+ */
+const CONFETTI_COLORS = ['#ED1C24', '#E8B931', '#221E20', '#2A3350'];
+
+/**
+ * Голын 40%-д хэзээ ч унахгүй: тэр хэсэгт 56px-ийн том оноо эргэлдэж
+ * байдаг бөгөөд дээгүүр нь өнгөт зүйл унавал тоог уншихад саад болно.
+ * Зүүн 30% (0..30) ба баруун 30% (70..100) -д л тараана.
+ */
+const CONFETTI = Array.from({ length: 22 }, (_, i) => {
+  const side = i % 2 === 0 ? 0 : 70;
+  return {
+    left: side + ((i * 17) % 30),
+    rotate: (i * 53) % 360,
+    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+    delay: (i % 6) * 15,
+  };
+});
 
 /** SSR-ээс ялгаатай client лазь-инициалчлал — зөвхөн анхны render-д нэг удаа бодогдоно. */
 function prefersReducedMotion(): boolean {
@@ -46,7 +63,14 @@ function prefersReducedMotion(): boolean {
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-export function ScoreCard({ data, inviteCode }: { data: FinishPayload; inviteCode: string }) {
+export function ScoreCard({
+  data, rank, total,
+}: {
+  data: FinishPayload;
+  /** Байр нь мэдэгдээгүй бол (API удаан/алдаа) мөрийг огт харуулахгүй — хүлээхгүй. */
+  rank: number | null;
+  total: number;
+}) {
   const isNewBest = data.totalScore === data.bestScore && data.attemptsUsed > 1;
 
   // Reduced motion: эцсийн тоо шууд, confetti байхгүй, ээлжлэл байхгүй — эдгээрийг
@@ -57,7 +81,6 @@ export function ScoreCard({ data, inviteCode }: { data: FinishPayload; inviteCod
   const [rowsOn, setRowsOn] = useState(reduced);
   const [confettiOn, setConfettiOn] = useState(false);
   const [bestOn, setBestOn] = useState(reduced && isNewBest);
-  const [inviteOn, setInviteOn] = useState(reduced);
 
   // Дуун дохио нь reduced-motion-оос ХАМААРАХГҮЙ: хөдөлгөөн багасгах хүсэлт
   // бол хөдөлгөөний тухай, дуу чимээний тухай биш. Дуугүй болгох сонголт нь
@@ -80,7 +103,7 @@ export function ScoreCard({ data, inviteCode }: { data: FinishPayload; inviteCod
     timers.push(setTimeout(() => setRowsOn(true), 1100));
     timers.push(setTimeout(() => setConfettiOn(true), 1100));
     if (isNewBest) timers.push(setTimeout(() => setBestOn(true), 1400));
-    timers.push(setTimeout(() => setInviteOn(true), 1500));
+    // 1500мс-ийн цохилт одоо УРИЛГЫН БЛОКИЙГ нээнэ (ResultClient) — энд товч байхгүй.
 
     let raf = 0;
     const countTimer = setTimeout(() => {
@@ -126,29 +149,94 @@ export function ScoreCard({ data, inviteCode }: { data: FinishPayload; inviteCod
         </div>
       )}
 
-      <p
-        className={`text-sm font-semibold tracking-[0.16em] text-[#6B6568] transition-opacity duration-150 ${
+      {/* A — чип мөр: нэр + оролдлогын тоолуур */}
+      <div
+        className={`flex items-baseline justify-between transition-opacity duration-150 ${
           labelOn ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        ТАНЫ ОНОО
-      </p>
+        <span className="sheet-tag">Таны оноо</span>
+        <span className="text-xs font-semibold tabular-nums text-[#6B6568]">
+          Оролдлого {data.attemptsUsed} / {GAME.MAX_ATTEMPTS}
+        </span>
+      </div>
 
-      <p className="mt-1 text-[56px] font-extrabold leading-none tabular-nums">
-        {display.toLocaleString('mn-MN')}
-      </p>
+      {/* B — том тоо + нийт боломжит оноо */}
+      <div className="mt-1 flex items-baseline gap-2">
+        <p className="text-[56px] font-extrabold leading-none tracking-[-0.02em] tabular-nums text-[#221E20]">
+          {display.toLocaleString('mn-MN')}
+        </p>
+        <span
+          className={`text-base font-semibold tabular-nums text-[#6B6568] transition-opacity duration-150 ${
+            labelOn ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          / {MAX_TOTAL_SCORE.toLocaleString('mn-MN')}
+        </span>
+      </div>
 
-      <div className="mt-5 space-y-2">
-        {ROWS(data).map((r, i) => (
-          <div
-            key={r.label}
-            className={rowsOn ? 'score-row-in flex items-baseline justify-between text-sm' : 'flex items-baseline justify-between text-sm opacity-0'}
-            style={rowsOn ? { animationDelay: `${i * 80}ms` } : undefined}
-          >
-            <span className="text-[#6B6568]">{r.label}</span>
-            <span className="font-semibold tabular-nums">{r.score.toLocaleString('mn-MN')}</span>
-          </div>
-        ))}
+      {/* C — байр. Мэдэгдээгүй бол мөр огт байхгүй, юу ч шилжихгүй. */}
+      {rank !== null && (
+        <p
+          className={`mt-2 text-sm font-semibold text-[#221E20] ${
+            rowsOn ? 'score-row-in' : 'opacity-0'
+          }`}
+        >
+          {rank <= GAME.PRIZE_PLACES && (
+            <span className="mr-1 text-[#8A5A00]" aria-hidden="true">★</span>
+          )}
+          {rank}-р байр · {total.toLocaleString('mn-MN')} оролцогчоос
+        </p>
+      )}
+
+      <div className="mt-4 h-px bg-[#E3DED2]" />
+
+      {/* D — тоглоом бүр: нэр, оноо / дээд оноо, хэмжүүр */}
+      <div className="mt-4 space-y-3">
+        {ROWS(data).map((r, i) => {
+          const perfect = r.score >= PER_GAME_MAX;
+          return (
+            <div
+              key={r.label}
+              className={rowsOn ? 'score-row-in' : 'opacity-0'}
+              style={{ animationDelay: `${i * 60}ms` }}
+              aria-label={`${r.label}: ${PER_GAME_MAX}-аас ${r.score} оноо`}
+            >
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm text-[#6B6568]">{r.label}</span>
+                <span className="tabular-nums">
+                  <span className="text-[15px] font-semibold text-[#221E20]">
+                    {r.score.toLocaleString('mn-MN')}
+                  </span>
+                  <span className="ml-1 text-xs text-[#6B6568]">
+                    / {PER_GAME_MAX.toLocaleString('mn-MN')}
+                  </span>
+                  {perfect && (
+                    <span className="ml-1 text-[13px] text-[#8A5A00]" title="Бүрэн оноо" aria-hidden="true">★</span>
+                  )}
+                </span>
+              </div>
+              {/*
+                Хэмжүүр — зөвхөн чимэглэл (aria-hidden). Мэдээллийг дээрх
+                бичвэр бүрэн дамжуулдаг тул 0 оноотой мөр ч «0 / 960» гэж
+                уншигдана. width биш scaleX-ээр хөдөлгөнө — compositor л
+                ажиллана.
+              */}
+              <div
+                aria-hidden="true"
+                className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#DAD5CC]"
+              >
+                <div
+                  className={`h-full rounded-full bg-[#ED1C24] ${rowsOn && !reduced ? 'meter-fill' : ''}`}
+                  style={{
+                    width: `${Math.round((Math.min(r.score, PER_GAME_MAX) / PER_GAME_MAX) * 100)}%`,
+                    animationDelay: `${i * 60}ms`,
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {isNewBest && (
@@ -163,21 +251,16 @@ export function ScoreCard({ data, inviteCode }: { data: FinishPayload; inviteCod
         </p>
       )}
 
+      {/*
+        Сэжигтэй тэмдэглэгээг зориуд ЧИМЭЭГҮЙ байлгав: memo-г алдаагүй
+        дуусгасан ЖИНХЭНЭ тоглогч ч энэ тэмдэглэгээг авдаг. Том анхааруулга
+        болговол шударга хүнийг гэм буруутай мэт сэтгэгдэлд оруулна.
+      */}
       {data.flagged && (
-        <p className="mt-3 text-xs text-[#6B6568]">
-          Энэ оролдлогыг шалгаж байна — хэвийн тул шагналд нөлөөлөхгүй.
+        <p className="mt-3 text-[13px] leading-relaxed text-[#6B6568]">
+          Энэ оролдлогыг нэмж шалгана. Хэвийн бол оноо бүрэн тооцогдоно.
         </p>
       )}
-
-      <Link
-        href={`/invite/${inviteCode}`}
-        className={`press mt-6 inline-flex min-h-12 items-center justify-center rounded-lg bg-[#C21019]
-                    px-6 font-semibold text-white transition-opacity duration-150 hover:bg-[#9E0D14] ${
-          inviteOn ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-      >
-        Урилгаа харах
-      </Link>
     </section>
   );
 }
