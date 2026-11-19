@@ -16,6 +16,14 @@
   --color-warm: #FFF1C9;
   --color-alert-night: #FF8A8E;
   --color-ok-night: #7FE0A6;
+  /*
+    Брэндийн улаан ШӨНИЙН хувилбар (#ED1C24-ийг газрын #161C2E дээр 55%).
+    Зөвхөн ДҮҮРГЭЛТ, хэзээ ч бичвэр биш. Бүтэн улаан дээр цаасан бичвэр
+    ердөө 4.38:1, frost бол 2.99:1 — доод 20px-ийн зурвас дээгүүр хөл
+    хэсгийн бичвэр гүйдэг тул тэнд бүтэн улаан хэрэглэж болохгүй.
+    Үүн дээр: цаас 8.49, frost 6.16, алт 4.94.
+  */
+  --color-brand-night: #8C1C28;
 }
 
 :root {
@@ -566,4 +574,120 @@ html[data-stage="running"] .bulb {
 }
 @media (prefers-reduced-motion: reduce) {
   .meter-fill { animation: none; transform: none; }
+}
+
+/* =========================================================================
+   ТӨМӨР ЗАМ БА ОНГОЦ — «2 тийшээгээ зам, дээгүүр нь онгоц»
+   (docs/design/2026-11-21-background-rail-and-plane.md)
+
+   Хөдөлгөөнт зангилаа: 15 → 19 (онгоц, beacon, 2 галт тэрэг). Төлбөрийг
+   нь /result-ийн confetti 22 → 18 болгож төлсөн — хамгийн дээд агшин 37,
+   40-ийн хязгаарт.
+   ========================================================================= */
+
+/* Зам — статик gradient зурвас, ямар ч зангилаа нэмэхгүй. */
+.tracks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 18px;
+  background-repeat: repeat-x;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(42,51,80,.75) 0 2px, transparent 2px 10px),
+    linear-gradient(rgba(201,214,230,.35), rgba(201,214,230,.35)),
+    repeating-linear-gradient(90deg, rgba(42,51,80,.55) 0 1.5px, transparent 1.5px 8px),
+    linear-gradient(rgba(201,214,230,.22), rgba(201,214,230,.22));
+  background-size: 12px 5px, 100% 1.5px, 10px 4px, 100% 1.5px;
+  background-position:
+    0 calc(100% - 1px), 0 calc(100% - 3px),
+    0 calc(100% - 11px), 0 calc(100% - 13px);
+}
+
+/* Галт тэрэг — гурван платформ дээр MLG контейнер + толгойн зүтгүүр. */
+.train {
+  position: absolute;
+  bottom: 1px;
+  left: 0;
+  width: 240px;
+  height: 19px;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  will-change: transform;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='176' height='14' viewBox='0 0 176 14'%3E%3Cdefs%3E%3Cg id='c'%3E%3Crect x='2' y='3' width='36' height='7' fill='%238C1C28' stroke='%23C9D6E6' stroke-opacity='.35' stroke-width='.6'/%3E%3Crect x='2' y='2' width='36' height='1.4' fill='%23C9D6E6' opacity='.8'/%3E%3Cg fill='%23FAF7F0' opacity='.35'%3E%3Crect x='11' y='3' width='1' height='7'/%3E%3Crect x='20' y='3' width='1' height='7'/%3E%3Crect x='29' y='3' width='1' height='7'/%3E%3C/g%3E%3Crect x='0' y='10' width='40' height='1.5' fill='%232A3350'/%3E%3Cg fill='%232A3350'%3E%3Ccircle cx='5' cy='12.5' r='1.5'/%3E%3Ccircle cx='10' cy='12.5' r='1.5'/%3E%3Ccircle cx='30' cy='12.5' r='1.5'/%3E%3Ccircle cx='35' cy='12.5' r='1.5'/%3E%3C/g%3E%3C/g%3E%3C/defs%3E%3Cuse href='%23c' x='0'/%3E%3Cuse href='%23c' x='44'/%3E%3Cuse href='%23c' x='88'/%3E%3Crect x='128' y='9' width='6' height='1' fill='%232A3350'/%3E%3Crect x='134' y='3' width='40' height='8.5' rx='1' fill='%23161C2E' stroke='%232A3350' stroke-width='.8'/%3E%3Crect x='134' y='2.2' width='40' height='1.4' fill='%23C9D6E6' opacity='.8'/%3E%3Crect x='165' y='5' width='5' height='3' fill='%23FFF1C9' opacity='.7'/%3E%3Ccircle cx='174.5' cy='8' r='1.5' fill='%23FFF1C9'/%3E%3Crect x='134' y='11' width='40' height='1' fill='%232A3350'/%3E%3Cg fill='%232A3350'%3E%3Ccircle cx='139' cy='12.5' r='1.5'/%3E%3Ccircle cx='145' cy='12.5' r='1.5'/%3E%3Ccircle cx='163' cy='12.5' r='1.5'/%3E%3Ccircle cx='169' cy='12.5' r='1.5'/%3E%3C/g%3E%3C/svg%3E");
+}
+.train-east { animation: train-east 40s linear -10s infinite; }
+.train-west {
+  left: auto;
+  right: 0;
+  bottom: 12px;
+  width: 204px;
+  height: 16px;
+  opacity: .7;
+  animation: train-west 56s linear -40s infinite;
+}
+@keyframes train-east {
+  0%   { transform: translateX(-100%); }
+  55%  { transform: translateX(100vw); }
+  100% { transform: translateX(100vw); }
+}
+/* scaleX(-1) нь кадр БҮРТ байна — эс бөгөөс интерполяцлагдаж онгоц/тэрэг эргэлдэнэ. */
+@keyframes train-west {
+  0%   { transform: translateX(100%)   scaleX(-1); }
+  54%  { transform: translateX(-100vw) scaleX(-1); }
+  100% { transform: translateX(-100vw) scaleX(-1); }
+}
+
+/* Онгоц — нэг зангилаа нисэлт, нэг зангилаа анивчдаг гэрэл. */
+.plane {
+  position: absolute;
+  top: 56px;
+  left: 0;
+  width: 84px;
+  height: 31px;
+  will-change: transform;
+  transition: opacity 240ms linear;
+  animation: plane-cross 64s linear -4s infinite;
+}
+@keyframes plane-cross {
+  0%       { transform: translateX(-100%) scaleX(1); }
+  20.3125% { transform: translateX(100vw) scaleX(1); }
+  50%      { transform: translateX(100vw) scaleX(-1); }
+  70.3125% { transform: translateX(-100%) scaleX(-1); }
+  100%     { transform: translateX(-100%) scaleX(1); }
+}
+.beacon { animation: beacon 1.2s steps(1, end) infinite; }
+@keyframes beacon {
+  0%   { opacity: .15; }
+  50%  { opacity: 1; }
+  60%  { opacity: .15; }
+  100% { opacity: .15; }
+}
+
+/*
+  Тоглоом явж байх үед: галт тэрэг ЗОГСОНО (зогссон тэрэг бол зогсоол дээрх
+  тэрэг — хэвийн харагдана), харин ОНГОЦ алга болно. Тэнгэрт хөлдсөн онгоц
+  алдаа мэт харагдана; мөн «Агаараас буулгах» тоглоомд тоглогч ӨӨРИЙН улаан
+  онгоцоо хардаг тул дээр нь өөр онгоц байх нь саад.
+*/
+html[data-stage="running"] .train,
+html[data-stage="running"] .beacon { animation-play-state: paused; }
+html[data-stage="running"] .plane { animation-play-state: paused; opacity: 0; }
+
+/*
+  Гар утасны гар нээлттэй (талбар фокустай) үед доод зурвас дээр юу ч
+  хөдлөхгүй. Тусдаа дүрэм — :has() дэмждэггүй хөтөч зөвхөн ҮҮНИЙГ алдана.
+*/
+html:has(input:focus, select:focus, textarea:focus) .train,
+html:has(input:focus, select:focus, textarea:focus) .beacon { animation-play-state: paused; }
+html:has(input:focus, select:focus, textarea:focus) .plane { animation-play-state: paused; opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Хөдөлгөөн зогсоно, гэхдээ юу ч алга болохгүй: тэрэгнүүд зогсоол дээр,
+     онгоц тэнгэрт зогссон, гэрлүүд нь асаалттай. */
+  .train { animation: none; }
+  .train-east { transform: translateX(6vw); }
+  .train-west { transform: translateX(-6vw) scaleX(-1); }
+  .plane { animation: none; transform: translateX(calc(100vw - 116px)); }
+  .beacon { animation: none; opacity: 1; }
 }
