@@ -5,6 +5,10 @@ import { apiPost } from '@/lib/api';
 import { STACK } from '@/lib/config';
 import { cranePosition, maxStackScore, type StackEvent, type StackLevel } from '@/lib/games/stack';
 import { Button } from '@/components/Button';
+import { audio } from '@/lib/audio';
+import {
+  StageReady, StageNotice, StageResult, useRunningStage,
+} from './StageChrome';
 import { Loader } from '@/components/Loader';
 
 type Props = {
@@ -23,6 +27,13 @@ type Phase = 'ready' | 'begin-error' | 'running' | 'submitting' | 'submit-error'
  */
 export function StackStage({ attemptId, schedule, onDone }: Props) {
   const [phase, setPhase] = useState<Phase>('ready');
+  useRunningStage(phase === 'running');
+  /**
+   * Одоогийн хувилбарт АЛДААНЫ ямар ч хариу байхгүй: хажуугаар буулгахад
+   * юу ч болохгүй тул тоглогч өөрийгөө оносон гэж бодож үлддэг. Товчны
+   * өнгө нь түгжээтэй (DROP_MS) хугацаанд тохирсон эсэхийг хэлнэ.
+   */
+  const [hit, setHit] = useState<'ok' | 'bad' | null>(null);
   const [levelIdx, setLevelIdx] = useState(0);
   const [craneX, setCraneX] = useState(50);
   const [stack, setStack] = useState<number[]>([]);
@@ -54,6 +65,7 @@ export function StackStage({ attemptId, schedule, onDone }: Props) {
       return;
     }
     setResultScore(res.data.score);
+    audio.cue('clear');
     setPhase('result');
     setTimeout(onDone, 700);
   }, [attemptId, onDone]);
@@ -95,6 +107,7 @@ export function StackStage({ attemptId, schedule, onDone }: Props) {
     setStack([]);
     setLiveScore(0);
     setCraneX(cranePosition(schedule[0], 0));
+    audio.cue('start');
     setPhase('running');
   }
 
@@ -112,6 +125,9 @@ export function StackStage({ attemptId, schedule, onDone }: Props) {
     eventsRef.current.push({ level: level.level, t });
 
     const offset = pos - centreRef.current;
+    const landed = Math.abs(offset) <= STACK.TOLERANCE_PCT;
+    audio.cue(landed ? 'correct' : 'wrong');
+    setHit(landed ? 'ok' : 'bad');
     if (Math.abs(offset) <= STACK.TOLERANCE_PCT) {
       rawScoreRef.current += STACK.BASE_POINTS
         + Math.round(STACK.PRECISION_POINTS * (1 - Math.abs(offset) / STACK.TOLERANCE_PCT));
@@ -126,6 +142,7 @@ export function StackStage({ attemptId, schedule, onDone }: Props) {
 
     setTimeout(() => {
       droppingRef.current = false;
+      setHit(null);
       setDropping(false);
       if (levelIdxRef.current >= schedule.length) void submit();
     }, STACK.DROP_MS);
@@ -133,24 +150,15 @@ export function StackStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'ready') {
     return (
-      <div className="enter py-10 text-center">
-        <h2 className="text-3xl font-extrabold tracking-tight">Контейнер овоолох</h2>
-        <p className="mx-auto mt-4 max-w-sm text-base leading-relaxed text-[#6B6568]">
-          Савалж буй контейнерийг өмнөх овоолгын <strong>төвд тааруулан</strong> «Буулгах» дарж буулга.
-        </p>
-        <Button className="mt-10 w-full" onClick={() => void begin()}>Эхлэх</Button>
-      </div>
+      <StageReady step={2} title="Контейнер овоолох" onStart={() => void begin()}>
+        Савалж буй контейнерийг өмнөх овоолгын <strong>төвд тааруулан</strong> «Буулгах» дарж буулга.
+      </StageReady>
     );
   }
 
   if (phase === 'begin-error') {
     return (
-      <div className="enter py-10 text-center">
-        <p role="alert" className="rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
-          Тоглоом эхлүүлж чадсангүй. Сүлжээгээ шалгаад дахин оролдоно уу.
-        </p>
-        <Button className="mt-6 w-full" onClick={() => void begin()}>Дахин оролдох</Button>
-      </div>
+      <StageNotice message="Тоглоом эхлүүлж чадсангүй. Сүлжээгээ шалгаад дахин оролдоно уу." actionLabel="Дахин оролдох" onAction={() => void begin()} />
     );
   }
 
@@ -160,47 +168,43 @@ export function StackStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'submit-error') {
     return (
-      <div className="enter py-10 text-center">
-        <p role="alert" className="rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
-          Илгээж чадсангүй. Таны тоглолт хадгалагдсан байгаа — дахин оролдоно уу.
-        </p>
-        <Button className="mt-6 w-full" onClick={() => void submit()}>Дахин илгээх</Button>
-      </div>
+      <StageNotice message="Илгээж чадсангүй. Таны тоглолт хадгалагдсан байгаа — дахин оролдоно уу." actionLabel="Дахин илгээх" onAction={() => void submit()} />
     );
   }
 
   if (phase === 'result') {
     return (
-      <p data-testid="stage-result" className="enter py-24 text-center text-xl font-bold">
-        Дүн: {resultScore} / {maxStackScore(schedule)}
-      </p>
+      <StageResult score={resultScore} max={maxStackScore(schedule)} />
     );
   }
 
   return (
     <div className="no-select">
       <div className="flex items-baseline justify-between text-sm font-semibold">
-        <span data-testid="stage-live-score" className="text-[#6B6568]">Оноо: {liveScore}</span>
-        <span data-testid="stack-level" className="text-[#6B6568]">
+        <span data-testid="stage-live-score" className="text-[#C9D6E6]">Оноо: {liveScore}</span>
+        <span data-testid="stack-level" className="text-[#C9D6E6]">
           Түвшин {Math.min(levelIdx + 1, schedule.length)} / {schedule.length}
         </span>
       </div>
 
       <div
-        className="relative mt-3 w-full touch-none overflow-hidden rounded-xl bg-[#221E20]"
+        data-hit={hit ?? undefined}
+        className="bay bay-stack relative mt-3 w-full touch-none overflow-hidden"
         style={{ height: 'min(52dvh, 380px)' }}
       >
         <div
           data-testid="crane"
-          className="absolute top-4 h-9 w-14 -translate-x-1/2 rounded-sm border border-[#FAF7F0]/50 bg-[#ED1C24]"
+          className="crane-box absolute top-4 h-9 w-14 -translate-x-1/2 rounded-sm
+                     border border-[#FAF7F0]/50 bg-[#ED1C24]"
           style={{ left: `${craneX}%` }}
         />
         <div className="absolute inset-x-0 bottom-0 flex h-[70%] flex-col-reverse items-stretch">
           {stack.map((pos, i) => (
             <div
               key={i}
-              className="obj-mount-centered relative mb-0.5 h-8 w-14 rounded-sm border border-[#FAF7F0]/40 bg-[#ED1C24]"
-              style={{ left: `${pos}%` }}
+              className="obj-mount-centered container-face relative mb-0.5 h-8 w-14 rounded-sm
+                         border border-[#FAF7F0]/40 bg-[#ED1C24]"
+              style={{ left: `${pos}%`, ['--stripe' as string]: i % 2 ? '10px' : '12px' }}
             />
           ))}
         </div>
@@ -208,7 +212,8 @@ export function StackStage({ attemptId, schedule, onDone }: Props) {
 
       <Button
         data-testid="drop-button"
-        className="press mt-3 w-full touch-none"
+        data-hit={hit ?? undefined}
+        className="lane-btn press mt-3 w-full touch-none"
         disabled={dropping}
         onPointerDown={drop}
       >

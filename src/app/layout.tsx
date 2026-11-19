@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { SoundToggle } from '@/components/SoundToggle';
+import { Sky } from '@/components/Sky';
+import { Garland } from '@/components/Garland';
 
 export const metadata: Metadata = {
   title: 'Monlogistics — Шинэ жилийн баяр 2026',
@@ -10,15 +13,20 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#ED1C24',
+  themeColor: '#0F1422',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="mn">
       <body className="min-h-dvh antialiased">
-        <div className="alkhan-band" aria-hidden="true" />
-        {children}
+        <Sky />
+        <div className="relative z-10">
+          <div className="alkhan-band" aria-hidden="true" />
+          <Garland />
+          <SoundToggle />
+          {children}
+        </div>
       </body>
     </html>
   );

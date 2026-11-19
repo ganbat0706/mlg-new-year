@@ -11,11 +11,13 @@ export default function RulesPage() {
   if (!isGameOpen()) redirect('/result');
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-xl flex-col px-5 py-10">
+    <main className="mx-auto flex min-h-dvh max-w-xl flex-col px-5 pb-28 pt-6">
       <div className="enter"><Brand /></div>
       <h1 className="enter mt-10 text-3xl font-extrabold tracking-tight">Дүрэм</h1>
 
-      <ol className="enter mt-8 space-y-6">
+      <div className="enter sheet mt-8">
+        <span className="sheet-tag">Тоглоомын дүрэм</span>
+        <ol className="mt-4 space-y-6">
         <li>
           <h2 className="text-lg font-bold">1. Зөв зам — {SORT.DURATION_MS / 1000} секунд</h2>
           <p className="mt-1.5 text-base leading-relaxed text-[#6B6568]">
@@ -41,7 +43,8 @@ export default function RulesPage() {
             Хамгийн сайн оноо тооцогдоно. Эхний {GAME.PRIZE_PLACES} байр шагналтай.
           </p>
         </li>
-      </ol>
+        </ol>
+      </div>
 
       <div className="flex-1" />
 

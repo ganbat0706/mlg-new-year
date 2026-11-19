@@ -7,6 +7,7 @@ import { loadSession } from '@/lib/session';
 import { saveLastFinish, type FinishPayload } from '@/lib/finish';
 import { Button } from '@/components/Button';
 import { Loader } from '@/components/Loader';
+import { audio } from '@/lib/audio';
 import { SortStage } from './SortStage';
 import { StackStage } from './StackStage';
 import { MemoStage } from './MemoStage';
@@ -66,6 +67,20 @@ export function PlayClient() {
       setStage(ns === 'finishing' ? 'sort' : ns);
     })();
   }, [router]);
+
+  // Хөтөч autoplay-г хориглодог тул дэвсгэр хөгжмийг ТОГЛОГЧИЙН ЭХНИЙ
+  // товшилтоор л эхлүүлнэ. /play хуудас дээрх ямар ч товшилт тохирно
+  // («Эхлэх» дарах нь хамгийн түгээмэл). Хуудсаас гарахад зогсоно.
+  useEffect(() => {
+    const onFirstTap = () => {
+      void audio.unlock().then(() => audio.startMusic());
+    };
+    document.addEventListener('pointerdown', onFirstTap, { once: true });
+    return () => {
+      document.removeEventListener('pointerdown', onFirstTap);
+      audio.stopMusic();
+    };
+  }, []);
 
   async function finishAndGo() {
     if (!start) return;

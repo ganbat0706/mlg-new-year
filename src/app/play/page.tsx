@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export default function PlayPage() {
   return (
-    <main className="mx-auto max-w-xl px-5 py-8">
+    <main className="mx-auto max-w-xl px-5 pb-28 pt-6">
       <div className="enter"><Brand className="h-8" /></div>
       <div className="enter mt-8">
         <PlayClient />

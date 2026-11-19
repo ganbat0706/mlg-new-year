@@ -2,22 +2,38 @@
 
 @theme {
   --color-brand: #ED1C24;
+  --color-brand-text: #C21019;
   --color-ink: #221E20;
   --color-paper: #FAF7F0;
   --color-muted: #6B6568;
   --color-gold: #E8B931;
   --color-gold-ink: #8A5A00;
   --color-frost: #C9D6E6;
+  /* Шөнийн гадаргуунууд — «Шинэ жилийн шөнө терминал дээр» (2026-11-20 чиглэл) */
+  --color-night-900: #0F1422;
+  --color-night-700: #1B2237;
+  --color-night-500: #2A3350;
+  --color-warm: #FFF1C9;
+  --color-alert-night: #FF8A8E;
+  --color-ok-night: #7FE0A6;
 }
 
 :root {
   --out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --land: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/*
+  Хуудас өөрөө шөнийн тэнгэр. Нэг л шалтгаанаар `color-scheme: light`:
+  төрөлх <select>, input, scrollbar нь цаасан карт дээр сууна — OS-ийн
+  харанхуй горим тэдгээрийг харлуулбал картны дотор тал уншигдахаа болино.
+  Загвар өөрөө шөнө тул харанхуй горимын тусдаа хувилбар хэрэггүй.
+*/
+html { color-scheme: light; }
 html, body {
-  background: var(--color-paper);
-  color: var(--color-ink);
+  background: var(--color-night-900);
+  color: var(--color-paper);
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -28,14 +44,16 @@ html, body {
 }
 
 /* =========================================================================
-   Алхан хээний зурвас — хуудас бүрийн дээд тал. Хөдөлгөөнгүй.
+   Алхан хээний зурвас — одоо алтан өнгөтэй: гэрлэн чимэглэл өлгөөтэй
+   гантрейн төмөр зам. Шөнийн дэвсгэр дээр брэндийн улаан ердөө 4.19:1
+   контрасттай тул бүдэг бор мэт харагддаг.
    ========================================================================= */
 .alkhan-band {
   height: 8px;
   width: 100%;
   background-repeat: repeat-x;
   background-size: 24px 8px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 8'%3E%3Cpath d='M0 6 H5 V2 H11 V6 H17 V2 H23 V6 H24' fill='none' stroke='%23ED1C24' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 8'%3E%3Cpath d='M0 6 H5 V2 H11 V6 H17 V2 H23 V6 H24' fill='none' stroke='%23E8B931' stroke-width='1.5'/%3E%3C/svg%3E");
 }
 
 /* =========================================================================
@@ -277,3 +295,217 @@ html, body {
     animation: none !important;
   }
 }
+
+
+/* =========================================================================
+   ШӨНИЙН ТЭНГЭР — хуудас бүрийн ард тогтмол сууна (layout.tsx).
+   Хөдөлгөөнт зангилааны тоо: 3 (цасны 2 давхарга + найгалтын бүрхүүл).
+   Од, хонх, зогсоолын дүрс бүгд статик — DOM зангилаа нэмэхгүй.
+   ========================================================================= */
+.sky {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(1px 1px at 12% 8%,  rgba(250,247,240,.9) 50%, transparent 51%),
+    radial-gradient(1px 1px at 31% 19%, rgba(250,247,240,.7) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 47% 6%, rgba(255,241,201,.9) 50%, transparent 51%),
+    radial-gradient(1px 1px at 63% 14%, rgba(250,247,240,.6) 50%, transparent 51%),
+    radial-gradient(1px 1px at 78% 4%,  rgba(250,247,240,.8) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 88% 22%, rgba(201,214,230,.8) 50%, transparent 51%),
+    radial-gradient(1px 1px at 22% 31%, rgba(250,247,240,.5) 50%, transparent 51%),
+    radial-gradient(1px 1px at 93% 36%, rgba(250,247,240,.5) 50%, transparent 51%),
+    linear-gradient(180deg, #0F1422 0%, #0F1422 55%, #1B2237 85%, #2A3350 100%);
+}
+
+/*
+  Цас — нэг зангилаанд нэг цасан ширхэг гэж хийвэл 40 div болно. Үүний
+  оронд босоо чиглэлд ЯГ ТААРСАН SVG хавтанг давтаж, нэг хавтангийн
+  өндрөөр гулсуулна — давталт хэзээ ч үсрэхгүй, зөвхөн compositor ажиллана.
+*/
+.snow-sway {
+  position: absolute;
+  inset: 0;
+  animation: snow-sway 7s ease-in-out -2s infinite alternate;
+}
+.snow {
+  position: absolute;
+  left: -24px;
+  right: -24px;
+  top: calc(-1 * var(--tile-h));
+  height: calc(100% + var(--tile-h));
+  background-repeat: repeat;
+  will-change: transform;
+  animation: snow-fall var(--dur) linear infinite;
+}
+.snow-far {
+  --tile-h: 360px;
+  --dur: 18s;
+  animation-delay: -5s;
+  opacity: .45;
+  background-size: 240px 360px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='360'%3E%3Cg fill='%23FFFFFF'%3E%3Ccircle cx='18' cy='22' r='1.3'/%3E%3Ccircle cx='71' cy='9' r='1.1'/%3E%3Ccircle cx='124' cy='48' r='1.4'/%3E%3Ccircle cx='203' cy='31' r='1.2'/%3E%3Ccircle cx='44' cy='96' r='1.2'/%3E%3Ccircle cx='160' cy='118' r='1.5'/%3E%3Ccircle cx='228' cy='140' r='1.1'/%3E%3Ccircle cx='9' cy='171' r='1.3'/%3E%3Ccircle cx='98' cy='203' r='1.2'/%3E%3Ccircle cx='186' cy='226' r='1.4'/%3E%3Ccircle cx='57' cy='262' r='1.1'/%3E%3Ccircle cx='141' cy='293' r='1.3'/%3E%3Ccircle cx='215' cy='318' r='1.2'/%3E%3Ccircle cx='31' cy='339' r='1.4'/%3E%3C/g%3E%3C/svg%3E");
+}
+.snow-near {
+  --tile-h: 480px;
+  --dur: 11s;
+  animation-delay: -3s;
+  opacity: .85;
+  background-size: 300px 480px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='480'%3E%3Cg fill='%23FFFFFF'%3E%3Ccircle cx='26' cy='30' r='2.4'/%3E%3Ccircle cx='112' cy='12' r='2'/%3E%3Ccircle cx='201' cy='58' r='2.8'/%3E%3Ccircle cx='277' cy='37' r='2.2'/%3E%3Ccircle cx='64' cy='128' r='2.1'/%3E%3Ccircle cx='158' cy='151' r='2.6'/%3E%3Ccircle cx='248' cy='186' r='2'/%3E%3Ccircle cx='14' cy='226' r='2.5'/%3E%3Ccircle cx='131' cy='262' r='2.2'/%3E%3Ccircle cx='222' cy='298' r='2.7'/%3E%3Ccircle cx='79' cy='347' r='2'/%3E%3Ccircle cx='183' cy='389' r='2.4'/%3E%3Ccircle cx='289' cy='422' r='2.1'/%3E%3Ccircle cx='41' cy='453' r='2.6'/%3E%3C/g%3E%3C/svg%3E");
+}
+@keyframes snow-fall {
+  from { transform: translateY(0); }
+  to   { transform: translateY(var(--tile-h)); }
+}
+@keyframes snow-sway {
+  from { transform: translateX(-8px); }
+  to   { transform: translateX(8px); }
+}
+.yard {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 72px;
+}
+
+/* Гэрлэн чимэглэл — анивчилт нь ЗӨВХӨН opacity, байрлал хөдлөхгүй. */
+.garland { display: block; width: 100%; height: 32px; }
+.bulb {
+  animation: bulb-twinkle 2.4s ease-in-out infinite;
+  transform-origin: center;
+}
+@keyframes bulb-twinkle {
+  0%, 100% { opacity: .55; }
+  50%      { opacity: 1; }
+}
+/*
+  Тоглоом явагдаж байх үед гэрлүүд ЗОГСОНО. Нүдний дээд захад юм анивчиж
+  байхад тоглогчийн хариу үйлдэл удаашардаг — шат ажиллаж байхад
+  <html data-stage="running"> тавигдана.
+*/
+html[data-stage="running"] .bulb {
+  animation-play-state: paused;
+  opacity: .85;
+}
+
+/* Цаасан хуудас — бичвэр, маягт бүр үүн дээр сууна. */
+.sheet {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.35) inset, 0 12px 32px rgba(0,0,0,.35);
+}
+.sheet-tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  color: var(--color-brand-text);
+  text-transform: uppercase;
+}
+.sheet-logo {
+  display: inline-block;
+  background: var(--color-paper);
+  border-radius: 10px;
+  padding: 10px 14px;
+  border-left: 6px solid var(--color-gold);
+}
+
+/* Тоглоомын талбай — «гэрэлтүүлэгтэй үзлэгийн зогсоол». */
+.bay {
+  background-color: var(--color-night-700);
+  background-image:
+    radial-gradient(70% 55% at 50% 38%, rgba(255,241,201,.10), transparent 70%),
+    linear-gradient(0deg, #232B45 0 10%, transparent 10%);
+  border: 1px solid rgba(201,214,230,.35);
+  border-radius: 12px;
+  transition: border-color 120ms linear;
+}
+.bay[data-hit="ok"]  { border-color: var(--color-ok-night); }
+.bay[data-hit="bad"] { border-color: var(--color-alert-night); }
+
+/* Хаалга нээгдэх (memo) ба хос лацдах хөдөлгөөн. */
+@keyframes door-flip { from { transform: rotateY(90deg); } to { transform: rotateY(0); } }
+@keyframes seal-pop  { 0% { transform: scale(1); } 55% { transform: scale(1.07); } 100% { transform: scale(1); } }
+.door-flip { animation: door-flip 80ms var(--out) both; }
+.seal-pop  { animation: seal-pop 220ms var(--spring) both; }
+
+/* Шатны дүнгийн тамга. */
+@keyframes stamp-in {
+  from { opacity: 0; transform: scale(1.15) rotate(-3deg); }
+  to   { opacity: 1; transform: scale(1) rotate(0); }
+}
+.stamp-in { animation: stamp-in 180ms var(--out) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  /*
+    Цас ЗОГСОНО, гэхдээ АЛГА БОЛОХГҮЙ — шөнө цастай хэвээр, зүгээр л
+    унахаа больсон. Хавтанг хагас өндрөөр нь гулсуулж тараасан талбай үлдээв.
+  */
+  .snow, .snow-sway { animation: none; }
+  .snow { transform: translateY(calc(var(--tile-h) * .5)); }
+  .bulb { animation: none; opacity: .9; }
+  .door-flip, .seal-pop, .stamp-in { animation: none; }
+}
+
+/* =========================================================================
+   Тоглоомын объектууд — бүгд ЗУРАГГҮЙ, зөвхөн gradient. Нэмэлт DOM
+   зангилаа үүсгэхгүйн тулд ::before болон background-image ашиглав.
+   ========================================================================= */
+
+/* Контейнерийн нүүр — улаан дээр цайвар босоо судлууд. */
+.container-face {
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0 var(--stripe, 12px),
+    rgba(250,247,240,.35) var(--stripe, 12px) calc(var(--stripe, 12px) + 2px)
+  );
+  border-top: 3px solid rgba(255,255,255,.8);   /* дээвэр дээрх цас */
+}
+
+/* Кранаас унжсан ачаа — кабель нь мөн адил элемент дээр ::before байдлаар
+   зурагдсан тул контейнертэйгээ хамт хөдөлнө, нэмэлт зангилаа үүсэхгүй. */
+.crane-box {
+  background-image: repeating-linear-gradient(
+    90deg, transparent 0 12px, rgba(250,247,240,.35) 12px 14px
+  );
+}
+.crane-box::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -16px;
+  width: 1px;
+  height: 16px;
+  background: var(--color-frost);
+}
+
+/* Гантрейн тэвш ба хоёр хөл — талбайн background дээр зурагдана (0 зангилаа). */
+.bay-stack {
+  background-image:
+    linear-gradient(180deg, transparent 10px, #2A3350 10px, #2A3350 13px, transparent 13px),
+    linear-gradient(90deg, transparent 6%, #2A3350 6%, #2A3350 calc(6% + 3px), transparent calc(6% + 3px)),
+    linear-gradient(90deg, transparent 94%, #2A3350 94%, #2A3350 calc(94% + 3px), transparent calc(94% + 3px)),
+    radial-gradient(70% 55% at 50% 38%, rgba(255,241,201,.10), transparent 70%),
+    linear-gradient(0deg, #232B45 0 10%, transparent 10%);
+}
+
+/* Хаалттай memo карт — чингэлэгийн хаалга: голын зай, хоёр цоожны тэвш, цасан малгай. */
+.memo-door {
+  background-image:
+    linear-gradient(90deg, transparent calc(50% - 1px), rgba(255,255,255,.4) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(0deg, transparent 38%, rgba(34,30,32,.45) 38% 42%, transparent 42% 58%, rgba(34,30,32,.45) 58% 62%, transparent 62%);
+  border-top: 3px solid rgba(255,255,255,.8);
+}
+/* Тохирсон хос — лацдагдсан, алтан. */
+.memo-sealed { border-top: 3px solid rgba(255,255,255,.55); }
+
+/* Зам сонгох товчны хариу үйлдэл — өнгө ТӨДИЙ, 160мс. */
+[data-hit="ok"].lane-btn  { background-color: #1A5C3D !important; }
+[data-hit="bad"].lane-btn { background-color: #8A0F15 !important; }
+.lane-btn { transition: background-color 120ms linear; }

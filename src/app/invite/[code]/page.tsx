@@ -14,7 +14,7 @@ export default async function InvitePage(
   if (!reg) notFound();
 
   return (
-    <main className="mx-auto max-w-xl px-5 py-10">
+    <main className="mx-auto max-w-xl px-5 pb-28 pt-6">
       <div className="enter"><Brand /></div>
 
       <h1 className="enter mt-10 text-3xl font-extrabold tracking-tight">Таны урилга</h1>

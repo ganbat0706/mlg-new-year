@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiPost } from '@/lib/api';
 import { MEMO, PLAY } from '@/lib/config';
 import { maxMemoScore, type MemoEvent } from '@/lib/games/memo';
-import { Button } from '@/components/Button';
+import { audio } from '@/lib/audio';
+import {
+  StageReady, StageNotice, StageResult, useRunningStage,
+} from './StageChrome';
 import { Loader } from '@/components/Loader';
 
 type Props = {
@@ -37,6 +40,7 @@ function CargoIcon() {
  */
 export function MemoStage({ attemptId, schedule, onDone }: Props) {
   const [phase, setPhase] = useState<Phase>('ready');
+  useRunningStage(phase === 'running');
   const [flipped, setFlipped] = useState<Set<number>>(new Set());
   const [matched, setMatched] = useState<Set<number>>(new Set());
   const [remaining, setRemaining] = useState<number>(MEMO.DURATION_MS);
@@ -70,6 +74,7 @@ export function MemoStage({ attemptId, schedule, onDone }: Props) {
       return;
     }
     setResultScore(res.data.score);
+    audio.cue('clear');
     setPhase('result');
     setTimeout(onDone, 700);
   }, [attemptId, onDone]);
@@ -112,6 +117,7 @@ export function MemoStage({ attemptId, schedule, onDone }: Props) {
     setMatched(new Set());
     setLiveScore(0);
     setRemaining(MEMO.DURATION_MS);
+    audio.cue('start');
     setPhase('running');
   }
 
@@ -141,6 +147,7 @@ export function MemoStage({ attemptId, schedule, onDone }: Props) {
     setFlipped((prev) => new Set(prev).add(card));
 
     if (schedule[first] === schedule[card]) {
+      audio.cue('correct');
       matchedRef.current.add(first);
       matchedRef.current.add(card);
       pairsFoundRef.current += 1;
@@ -155,6 +162,7 @@ export function MemoStage({ attemptId, schedule, onDone }: Props) {
 
       if (pairsFoundRef.current === totalPairs) void submit();
     } else {
+      audio.cue('wrong');
       lockUntilRef.current = now + MEMO.LOCK_MS;
       setTimeout(() => {
         setFlipped((prev) => {
@@ -169,24 +177,15 @@ export function MemoStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'ready') {
     return (
-      <div className="enter py-10 text-center">
-        <h2 className="text-3xl font-extrabold tracking-tight">Хос манифест</h2>
-        <p className="mx-auto mt-4 max-w-sm text-base leading-relaxed text-[#6B6568]">
-          Нуугдсан <strong>хос контейнерийг</strong> дарж олоорой — эрт дуусгах тусам урамшуулал.
-        </p>
-        <Button className="mt-10 w-full" onClick={() => void begin()}>Эхлэх</Button>
-      </div>
+      <StageReady step={3} title="Хос манифест" onStart={() => void begin()}>
+        Нуугдсан <strong>хос контейнерийг</strong> дарж олоорой — эрт дуусгах тусам урамшуулал.
+      </StageReady>
     );
   }
 
   if (phase === 'begin-error') {
     return (
-      <div className="enter py-10 text-center">
-        <p role="alert" className="rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
-          Тоглоом эхлүүлж чадсангүй. Сүлжээгээ шалгаад дахин оролдоно уу.
-        </p>
-        <Button className="mt-6 w-full" onClick={() => void begin()}>Дахин оролдох</Button>
-      </div>
+      <StageNotice message="Тоглоом эхлүүлж чадсангүй. Сүлжээгээ шалгаад дахин оролдоно уу." actionLabel="Дахин оролдох" onAction={() => void begin()} />
     );
   }
 
@@ -196,20 +195,13 @@ export function MemoStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'submit-error') {
     return (
-      <div className="enter py-10 text-center">
-        <p role="alert" className="rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
-          Илгээж чадсангүй. Таны тоглолт хадгалагдсан байгаа — дахин оролдоно уу.
-        </p>
-        <Button className="mt-6 w-full" onClick={() => void submit()}>Дахин илгээх</Button>
-      </div>
+      <StageNotice message="Илгээж чадсангүй. Таны тоглолт хадгалагдсан байгаа — дахин оролдоно уу." actionLabel="Дахин илгээх" onAction={() => void submit()} />
     );
   }
 
   if (phase === 'result') {
     return (
-      <p data-testid="stage-result" className="enter py-24 text-center text-xl font-bold">
-        Дүн: {resultScore} / {maxMemoScore(schedule)}
-      </p>
+      <StageResult score={resultScore} max={maxMemoScore(schedule)} />
     );
   }
 
@@ -218,15 +210,16 @@ export function MemoStage({ attemptId, schedule, onDone }: Props) {
   return (
     <div className="no-select">
       <div className="flex items-baseline justify-between text-sm font-semibold">
-        <span data-testid="stage-live-score" className="text-[#6B6568]">Оноо: {liveScore}</span>
-        <span className={secondsLeft <= 5 ? 'text-[#C21019]' : 'text-[#6B6568]'}>{secondsLeft} сек</span>
+        <span data-testid="stage-live-score" className="text-[#C9D6E6]">Оноо: {liveScore}</span>
+        <span className={secondsLeft <= 5 ? 'text-[#FF8A8E]' : 'text-[#C9D6E6]'}>{secondsLeft} сек</span>
       </div>
 
       <div
-        className="mt-3 grid touch-none grid-cols-4 gap-2 rounded-xl bg-[#221E20] p-3"
+        className="bay mt-3 grid touch-none grid-cols-4 gap-2 p-3"
       >
         {schedule.map((pairId, card) => {
-          const isOpen = flipped.has(card) || matched.has(card);
+          const isMatched = matched.has(card);
+          const isOpen = flipped.has(card) || isMatched;
           return (
             <button
               key={card}
@@ -234,16 +227,21 @@ export function MemoStage({ attemptId, schedule, onDone }: Props) {
               data-testid={`memo-card-${card}`}
               aria-label={isOpen ? WORDS[pairId] : 'Нээгээгүй контейнер'}
               onPointerDown={() => tap(card, Date.now() - startedAtRef.current)}
+              style={{ position: 'relative' }}
               className={`flex min-h-16 touch-none flex-col items-center justify-center gap-1
-                         rounded-md text-[11px] font-semibold leading-tight text-[#FAF7F0]
-                         transition ${
-                isOpen ? 'bg-[#4A4446]' : 'bg-[#ED1C24] hover:bg-[#C21019]'
+                         rounded-md text-[12px] font-bold leading-tight transition ${
+                isMatched
+                  ? 'memo-sealed seal-pop bg-[#E8B931] text-[#221E20]'
+                  : isOpen
+                    ? 'door-flip border border-[#DAD5CC] bg-[#FAF7F0] text-[#221E20]'
+                    : 'memo-door bg-[#ED1C24] hover:bg-[#C21019]'
               }`}
             >
               {isOpen ? (
-                <span key={card} className="obj-mount flex flex-col items-center gap-1">
+                <span key={card} className="flex flex-col items-center gap-1">
                   <CargoIcon />
                   <span>{WORDS[pairId]}</span>
+                  {isMatched && <span aria-hidden="true" className="absolute right-1 top-0.5 text-[11px]">✓</span>}
                 </span>
               ) : null}
             </button>

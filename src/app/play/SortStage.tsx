@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiPost } from '@/lib/api';
 import { SORT } from '@/lib/config';
 import { maxSortScore, type SortEvent, type SortItem, type SortLane, type SortMode } from '@/lib/games/sort';
-import { Button } from '@/components/Button';
+import { audio } from '@/lib/audio';
+import {
+  StageReady, StageNotice, StageResult, useRunningStage,
+} from './StageChrome';
 import { Loader } from '@/components/Loader';
 
 type Props = {
@@ -73,6 +76,14 @@ function DamagedIcon() {
  */
 export function SortStage({ attemptId, schedule, onDone }: Props) {
   const [phase, setPhase] = useState<Phase>('ready');
+  useRunningStage(phase === 'running');
+  /**
+   * Товшилтын хариу: дарсан товч болон талбайн хүрээ 160мс өнгөө солино.
+   * ЗӨВХӨН өнгө — тоглогчийн дарах юмны ойролцоо юу ч хөдлөхгүй.
+   */
+  const [hit, setHit] = useState<{ lane: SortLane; kind: 'ok' | 'bad' } | null>(null);
+  const hitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (hitTimer.current) clearTimeout(hitTimer.current); }, []);
   const [index, setIndex] = useState(0);
   const [remaining, setRemaining] = useState<number>(SORT.DURATION_MS);
   const [liveScore, setLiveScore] = useState(0);
@@ -110,6 +121,7 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
       return;
     }
     setResultScore(res.data.score);
+    audio.cue('clear');
     setPhase('result');
     setTimeout(onDone, 700);
   }, [attemptId, onDone]);
@@ -155,6 +167,7 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
     setIndex(0);
     setLiveScore(0);
     setRemaining(SORT.DURATION_MS);
+    audio.cue('start');
     setPhase('running');
   }
 
@@ -177,7 +190,12 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
     eventsRef.current.push({ id: item.id, lane, t });
 
     const expected: SortLane = item.damaged ? 'return' : item.mode;
-    rawScoreRef.current += lane === expected ? SORT.CORRECT_POINTS : SORT.WRONG_POINTS;
+    const ok = lane === expected;
+    audio.cue(ok ? 'correct' : 'wrong');
+    setHit({ lane, kind: ok ? 'ok' : 'bad' });
+    if (hitTimer.current) clearTimeout(hitTimer.current);
+    hitTimer.current = setTimeout(() => setHit(null), 160);
+    rawScoreRef.current += ok ? SORT.CORRECT_POINTS : SORT.WRONG_POINTS;
     // Серверийн адил эцэст нь ГАГЦХҮҮ нэг удаа clamp хийнэ — tap тутамд биш.
     setLiveScore(Math.max(0, rawScoreRef.current));
     setIndex(indexRef.current);
@@ -187,25 +205,16 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'ready') {
     return (
-      <div className="enter py-10 text-center">
-        <h2 className="text-3xl font-extrabold tracking-tight">Зөв зам</h2>
-        <p className="mx-auto mt-4 max-w-sm text-base leading-relaxed text-[#6B6568]">
-          Ачааг зөв тээврийн хэрэгсэл рүү (<strong>төмөр зам · авто · агаар</strong>) чиглүүл,{' '}
+      <StageReady step={1} title="Зөв зам" onStart={() => void begin()}>
+        Ачааг зөв тээврийн хэрэгсэл рүү (<strong>төмөр зам · авто · агаар</strong>) чиглүүл,{' '}
           <strong>эвдэрсэн</strong> ачааг «Буцаах» руу илгээ.
-        </p>
-        <Button className="mt-10 w-full" onClick={() => void begin()}>Эхлэх</Button>
-      </div>
+      </StageReady>
     );
   }
 
   if (phase === 'begin-error') {
     return (
-      <div className="enter py-10 text-center">
-        <p role="alert" className="rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
-          Тоглоом эхлүүлж чадсангүй. Сүлжээгээ шалгаад дахин оролдоно уу.
-        </p>
-        <Button className="mt-6 w-full" onClick={() => void begin()}>Дахин оролдох</Button>
-      </div>
+      <StageNotice message="Тоглоом эхлүүлж чадсангүй. Сүлжээгээ шалгаад дахин оролдоно уу." actionLabel="Дахин оролдох" onAction={() => void begin()} />
     );
   }
 
@@ -215,20 +224,13 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
 
   if (phase === 'submit-error') {
     return (
-      <div className="enter py-10 text-center">
-        <p role="alert" className="rounded-lg bg-[#FDECEC] px-4 py-3 text-base text-[#8A0F15]">
-          Илгээж чадсангүй. Таны тоглолт хадгалагдсан байгаа — дахин оролдоно уу.
-        </p>
-        <Button className="mt-6 w-full" onClick={() => void submit()}>Дахин илгээх</Button>
-      </div>
+      <StageNotice message="Илгээж чадсангүй. Таны тоглолт хадгалагдсан байгаа — дахин оролдоно уу." actionLabel="Дахин илгээх" onAction={() => void submit()} />
     );
   }
 
   if (phase === 'result') {
     return (
-      <p data-testid="stage-result" className="enter py-24 text-center text-xl font-bold">
-        Дүн: {resultScore} / {maxSortScore(schedule)}
-      </p>
+      <StageResult score={resultScore} max={maxSortScore(schedule)} />
     );
   }
 
@@ -238,20 +240,26 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
   return (
     <div className="no-select">
       <div className="flex items-baseline justify-between text-sm font-semibold">
-        <span data-testid="stage-live-score" className="text-[#6B6568]">Оноо: {liveScore}</span>
-        <span className={secondsLeft <= 3 ? 'text-[#C21019]' : 'text-[#6B6568]'}>{secondsLeft} сек</span>
+        <span data-testid="stage-live-score" className="text-[#C9D6E6]">Оноо: {liveScore}</span>
+        <span className={secondsLeft <= 3 ? 'text-[#FF8A8E]' : 'text-[#C9D6E6]'}>{secondsLeft} сек</span>
       </div>
 
       <div
         data-testid="sort-stage-item"
-        className="relative mt-3 flex w-full touch-none items-center justify-center overflow-hidden
-                   rounded-xl bg-[#221E20]"
+        data-hit={hit?.kind}
+        className="bay relative mt-3 flex w-full touch-none items-center justify-center overflow-hidden"
         style={{ height: 'min(48dvh, 340px)' }}
       >
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-2 top-2 text-[11px] tracking-[0.14em] text-[#C9D6E6]/70"
+        >
+          ХЯНАЛТЫН ЦЭГ
+        </span>
         {current && (
           <div key={current.id} className="obj-mount flex flex-col items-center gap-3">
             {current.damaged ? <DamagedIcon /> : <ModeIcon mode={current.mode} />}
-            <p data-testid="sort-label" className="text-lg font-bold text-[#FAF7F0]">
+            <p data-testid="sort-label" className="text-xl font-bold text-[#FAF7F0]">
               {current.damaged ? 'Эвдэрсэн' : MODE_LABEL[current.mode]}
             </p>
           </div>
@@ -264,9 +272,10 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
             key={lane}
             type="button"
             data-testid={`lane-${lane}`}
+            data-hit={hit?.lane === lane ? hit.kind : undefined}
             onPointerDown={() => tap(lane, Date.now() - startedAtRef.current)}
-            className="press min-h-14 touch-none rounded-lg bg-[#C21019] px-1 text-sm font-semibold
-                       leading-tight text-white hover:bg-[#9E0D14]"
+            className="lane-btn press min-h-14 touch-none rounded-lg bg-[#C21019] px-1 text-sm
+                       font-semibold leading-tight text-white hover:bg-[#9E0D14]"
           >
             {label}
           </button>

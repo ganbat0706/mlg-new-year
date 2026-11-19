@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { FinishPayload } from '@/lib/finish';
+import { audio } from '@/lib/audio';
 
 /**
  * Онооны карт — апп доторх цорын ганц зохион байгуулалттай (orchestrated)
@@ -57,6 +58,19 @@ export function ScoreCard({ data, inviteCode }: { data: FinishPayload; inviteCod
   const [bestOn, setBestOn] = useState(reduced && isNewBest);
   const [inviteOn, setInviteOn] = useState(reduced);
 
+  // Дуун дохио нь reduced-motion-оос ХАМААРАХГҮЙ: хөдөлгөөн багасгах хүсэлт
+  // бол хөдөлгөөний тухай, дуу чимээний тухай биш. Дуугүй болгох сонголт нь
+  // SoundToggle-д тусдаа байна.
+  useEffect(() => {
+    audio.cue('reveal');
+    if (isNewBest) {
+      const t = setTimeout(() => audio.cue('best'), reduced ? 300 : 1400);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (reduced) return;
 
@@ -90,7 +104,7 @@ export function ScoreCard({ data, inviteCode }: { data: FinishPayload; inviteCod
 
   return (
     <section
-      className="enter relative overflow-hidden rounded-xl border-2 border-[#ED1C24] bg-white p-5"
+      className="enter relative overflow-hidden rounded-xl border-2 border-[#E8B931] bg-white p-5"
       style={{ animationDuration: '240ms' }}
     >
       {confettiOn && !reduced && (
