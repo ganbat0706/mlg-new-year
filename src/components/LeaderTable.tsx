@@ -20,11 +20,11 @@ export function LeaderTable({
   rows, highlightRank,
 }: { rows: Row[]; highlightRank?: number | null }) {
   if (rows.length === 0) {
-    return <p className="py-8 text-center text-[#6B6568]">Одоогоор оролцогч алга.</p>;
+    return <p className="sheet py-8 text-center text-[#6B6568]">Одоогоор оролцогч алга.</p>;
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[#DAD5CC]">
+    <div className="overflow-hidden rounded-xl border border-[#DAD5CC] bg-[#FAF7F0] text-[#221E20]">
       <table className="w-full table-fixed border-collapse text-base">
         <caption className="sr-only">Оноогоор эрэмбэлсэн жагсаалт</caption>
         <thead>

@@ -53,7 +53,7 @@ export function ResultClient({ gameOpen }: { gameOpen: boolean }) {
   }
 
   const field =
-    'min-h-12 w-full rounded-lg border border-[#DAD5CC] bg-white px-4 text-base ' +
+    'min-h-12 w-full rounded-lg border border-[#DAD5CC] bg-white px-4 text-base text-[#221E20] ' +
     'outline-none focus:border-[#ED1C24]';
 
   return (

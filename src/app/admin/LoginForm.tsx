@@ -25,7 +25,7 @@ export function LoginForm() {
         <input
           id="pw" type="password" value={password} autoComplete="current-password"
           onChange={(e) => setPassword(e.target.value)}
-          className="min-h-12 w-full rounded-lg border border-[#DAD5CC] bg-white px-4
+          className="min-h-12 w-full rounded-lg border border-[#DAD5CC] bg-white px-4 text-[#221E20]
                      text-base outline-none focus:border-[#ED1C24]"
         />
       </div>
