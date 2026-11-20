@@ -3,12 +3,16 @@ import { redirect } from 'next/navigation';
 import {
   isGameOpen, SORT, STACK, MEMO, DROP, GAME,
 } from '@/lib/config';
+import { activeContest } from '@/lib/contests';
 import { Brand } from '@/components/Brand';
 
 export const dynamic = 'force-dynamic';
 
 export default function RulesPage() {
   if (!isGameOpen()) redirect('/result');
+
+  const open = activeContest();
+  const playable = open?.id === 'games' && open.ready;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col px-5 pb-28 pt-6">
@@ -54,13 +58,28 @@ export default function RulesPage() {
 
       <div className="flex-1" />
 
-      <Link
-        href="/play"
-        className="enter press mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-lg
-                   bg-[#C21019] px-8 text-lg font-semibold text-white hover:bg-[#9E0D14]"
-      >
-        Эхлэх
-      </Link>
+      {/*
+        «Эхлэх» нь зөвхөн Ачааны тоглоомын цонх НЭЭЛТТЭЙ үед л утгатай.
+        Хаалттай үед товч нь дарагдаад /play дээр алдаа заана — тиймээс
+        энд шударгаар хэлээд нүүр хуудасны карт руу буцаана.
+      */}
+      {playable ? (
+        <Link
+          href="/play"
+          className="enter press mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-lg
+                     bg-[#C21019] px-8 text-lg font-semibold text-white hover:bg-[#9E0D14]"
+        >
+          Эхлэх
+        </Link>
+      ) : (
+        <Link
+          href="/"
+          className="enter press mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-lg
+                     border border-[#C9D6E6]/45 px-8 text-lg font-semibold text-[#C9D6E6]"
+        >
+          Тэмцээний хуваарь харах
+        </Link>
+      )}
     </main>
   );
 }

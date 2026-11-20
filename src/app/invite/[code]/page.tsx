@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Brand } from '@/components/Brand';
 import { findByInviteCode } from '@/lib/repo/registrations';
@@ -31,6 +32,14 @@ export default async function InvitePage(
       <p className="enter mt-6 text-sm leading-relaxed text-[#6B6568]">
         Зураг татагдахгүй бол дээрх зураг дээр удаан дарж «Зураг хадгалах» сонгоно уу.
       </p>
+
+      <Link
+        href="/"
+        className="enter press mt-8 flex min-h-14 items-center justify-center rounded-xl bg-[#C21019]
+                   px-6 text-lg font-semibold text-white hover:bg-[#9E0D14]"
+      >
+        Тэмцээн рүү →
+      </Link>
     </main>
   );
 }

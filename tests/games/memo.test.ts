@@ -27,7 +27,7 @@ describe('generateMemoSchedule', () => {
 });
 
 describe('maxMemoScore', () => {
-  it('6 × 130 + 180 = 960', () => {
+  it('PAIRS × PAIR_POINTS + BONUS_MAX = 960', () => {
     const schedule = generateMemoSchedule(3);
     expect(maxMemoScore(schedule)).toBe(960);
   });

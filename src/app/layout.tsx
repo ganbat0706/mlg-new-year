@@ -6,7 +6,7 @@ import { Garland } from '@/components/Garland';
 
 export const metadata: Metadata = {
   title: 'Monlogistics — Шинэ жилийн баяр 2026',
-  description: 'Тоглоом тоглож урилгаа аваарай.',
+  description: 'Гурван тэмцээн — цаг нь болмогц картаа дараад тоглоно.',
 };
 
 export const viewport: Viewport = {

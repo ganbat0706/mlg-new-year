@@ -21,7 +21,7 @@ export const STACK = {
   PRECISION_POINTS: 60,
 } as const;
 
-/** 3. Хос манифест — санах ойн тоглоом. Дээд оноо: 6 × 130 + 180 = 960. */
+/** 3. Хос манифест — санах ойн тоглоом. Дээд оноо: 8 × 100 + 160 = 960. */
 export const MEMO = {
   DURATION_MS: 24_000,
   PAIRS: 8,

@@ -58,6 +58,10 @@ export function ResultClient({ gameOpen }: { gameOpen: boolean }) {
     /* eslint-disable react-hooks/set-state-in-effect -- дээрх тайлбарыг үз */
     setSession(s);
     setFinish(takeLastFinish());
+    // Нүүр хуудасны дууссан карт `?contest=<id>`-тэй ирдэг — тэр табыг нээнэ.
+    // `useSearchParams` нь Suspense шаарддаг тул шууд location-оос уншина.
+    const want = new URLSearchParams(window.location.search).get('contest');
+    if (CONTESTS.some((c) => c.id === want)) setTab(want as ContestId);
     /* eslint-enable react-hooks/set-state-in-effect */
 
     // Жагсаалт болон ӨӨРИЙН БАЙРЫГ зэрэг ачаална. Байр нь ирэхгүй бол

@@ -34,7 +34,10 @@ export function RegisterForm() {
       }
 
       saveSession(body.data);
-      router.push('/rules');
+      // Урилга нь БҮРТГЭЛИЙН үр дүн (тоглоомын биш) тул шууд түүнийг
+      // харуулна. Тоглоом руу тэндээс нүүр хуудсаар дамжиж, картаа дарж
+      // ороно.
+      router.push(`/invite/${body.data.inviteCode}`);
     } catch {
       setError('Сүлжээний алдаа. Дахин оролдоно уу.');
     } finally {
