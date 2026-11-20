@@ -21,6 +21,12 @@ export const attempts = pgTable('attempts', {
   registrationId: uuid('registration_id').notNull().references(() => registrations.id),
   status: text('status').$type<'in_progress' | 'completed' | 'invalid'>().notNull().default('in_progress'),
   seed: integer('seed').notNull(),
+  /**
+   * Аль тэмцээний оролдлого вэ (contests.ts дахь id). Жагсаалт тэмцээн
+   * тус бүрээр гарах бөгөөд нэг тэмцээнд нэг ажилтан нэг л удаа
+   * тоглоно — энэ баганагүйгээр тэр хоёрын аль нь ч боломжгүй.
+   */
+  contestId: text('contest_id').notNull(),
   // Дөрвөн тоглоом — Зөв зам, Контейнер овоолох, Хос манифест, Агаараас буулгах.
   sortScore: integer('sort_score').notNull().default(0),
   stackScore: integer('stack_score').notNull().default(0),

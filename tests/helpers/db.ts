@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
-  ensureInviteSequence, ensureOneOpenAttemptIndex,
+  ensureInviteSequence, ensureOneOpenAttemptIndex, ensureOneAttemptPerContest,
 } from '../../scripts/db-setup';
 
 /** Тест бүрийн өмнө DB-г цэвэрлэж, sequence-ийг 1 рүү буцаана. */
@@ -16,6 +16,7 @@ export async function resetDb(): Promise<void> {
   await db.execute(sql`TRUNCATE attempts, registrations RESTART IDENTITY CASCADE`);
   await ensureInviteSequence();
   await ensureOneOpenAttemptIndex();
+  await ensureOneAttemptPerContest();
   await db.execute(sql`ALTER SEQUENCE invite_seq_counter RESTART WITH 1`);
 }
 

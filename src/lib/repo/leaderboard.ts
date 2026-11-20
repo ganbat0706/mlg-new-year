@@ -1,6 +1,6 @@
-import { gt } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { registrations } from '@/lib/db/schema';
+import { attempts, registrations } from '@/lib/db/schema';
 import { GAME } from '@/lib/config';
 import { rankAll } from '@/lib/scoring';
 
@@ -12,21 +12,40 @@ export type LeaderRow = {
   isPrize: boolean;
 };
 
-/** Оноо авсан (0-ээс дээш) бүртгэлүүдийг эрэмбэлсэн дарааллаар. */
-async function rankedRows() {
+/**
+ * Жагсаалт нь ТЭМЦЭЭН ТУС БҮРЭЭР гарна.
+ *
+ * Оноог `registrations.bestScore`-оос биш, тухайн тэмцээнд ДУУССАН
+ * оролдлогоос шууд уншина: тэр багана нь бүх тэмцээний хамгийн сайн оноо
+ * (урилган дээр хэрэглэгддэг) бөгөөд нэг тэмцээний жагсаалтад тохирохгүй.
+ *
+ * Нэг тэмцээнд нэг ажилтан нэг л удаа тоглодог тул мөр давхардахгүй;
+ * гэвч тохиргоо өөрчлөгдвөл давхардахад бэлэн байхын тулд хамгийн өндөр
+ * онооны мөрийг сонгоно.
+ */
+async function rankedRows(contestId: string) {
   const rows = await db.select({
-    id: registrations.id,
+    id: attempts.registrationId,
     lastName: registrations.lastName,
     firstName: registrations.firstName,
-    bestScore: registrations.bestScore,
-    bestFinishedAt: registrations.bestFinishedAt,
-  }).from(registrations).where(gt(registrations.bestScore, 0));
+    bestScore: attempts.totalScore,
+    bestFinishedAt: attempts.finishedAt,
+  })
+    .from(attempts)
+    .innerJoin(registrations, eq(registrations.id, attempts.registrationId))
+    .where(and(eq(attempts.contestId, contestId), eq(attempts.status, 'completed')));
 
-  return rankAll(rows);
+  const best = new Map<string, (typeof rows)[number]>();
+  for (const r of rows) {
+    const prev = best.get(r.id);
+    if (!prev || r.bestScore > prev.bestScore) best.set(r.id, r);
+  }
+
+  return rankAll([...best.values()].filter((r) => r.bestScore > 0));
 }
 
-export async function getLeaderboard(limit?: number): Promise<LeaderRow[]> {
-  const ranked = await rankedRows();
+export async function getLeaderboard(contestId: string, limit?: number): Promise<LeaderRow[]> {
+  const ranked = await rankedRows(contestId);
   const sliced = typeof limit === 'number' ? ranked.slice(0, limit) : ranked;
 
   return sliced.map((r) => ({
@@ -38,10 +57,10 @@ export async function getLeaderboard(limit?: number): Promise<LeaderRow[]> {
   }));
 }
 
-export async function getStanding(registrationId: string): Promise<
+export async function getStanding(contestId: string, registrationId: string): Promise<
   { rank: number; bestScore: number; total: number } | null
 > {
-  const ranked = await rankedRows();
+  const ranked = await rankedRows(contestId);
   const me = ranked.find((r) => r.id === registrationId);
   if (!me) return null;
   return { rank: me.rank, bestScore: me.bestScore, total: ranked.length };

@@ -6,6 +6,7 @@ import { apiGet, apiPost } from '@/lib/api';
 import { loadSession, type Session } from '@/lib/session';
 import { takeLastFinish, type FinishPayload } from '@/lib/finish';
 import { GAME } from '@/lib/config';
+import { CONTESTS, contestState, focusContest, type ContestId } from '@/lib/contests';
 import { Button } from '@/components/Button';
 import { LeaderTable } from '@/components/LeaderTable';
 import { ScoreCard } from './ScoreCard';
@@ -18,10 +19,19 @@ type LeaderRow = {
 type Standing = {
   lastName: string; firstName: string; inviteCode: string;
   bestScore: number; rank: number | null; total: number;
+  contestId: ContestId; contestName: string;
 };
+
+type LeaderResponse = { contestId: string; contestName: string; rows: LeaderRow[] };
 
 export function ResultClient({ gameOpen }: { gameOpen: boolean }) {
   const [rows, setRows] = useState<LeaderRow[]>([]);
+  /*
+    Гурван тусдаа тэмцээн тул жагсаалт ч гурав. Анхдагчаар нээлттэй нь,
+    эс бөгөөс сүүлд дууссан нь — хүн орж ирээд хамгийн сүүлийн үр дүнг
+    хардаг. Бусдыг нь таб дарж үзнэ.
+  */
+  const [tab, setTab] = useState<ContestId>(() => focusContest().id);
   const [mine, setMine] = useState<Standing | null>(null);   // өөрийн байр (session-оос)
   const [found, setFound] = useState<Standing | null>(null); // утсаар хайсан хүн
   const [session, setSession] = useState<Session | null>(null);
@@ -52,15 +62,27 @@ export function ResultClient({ gameOpen }: { gameOpen: boolean }) {
 
     // Жагсаалт болон ӨӨРИЙН БАЙРЫГ зэрэг ачаална. Байр нь ирэхгүй бол
     // (удаан/алдаа) зүгээр л харуулахгүй — хуудсыг ХЭЗЭЭ Ч хүлээлгэхгүй.
-    void apiGet<LeaderRow[]>('/api/leaderboard?limit=200').then((res) => {
-      if (res.ok) setRows(res.data);
-    });
-    if (s) {
-      void apiPost<Standing>('/api/standing', { registrationId: s.id }).then((res) => {
-        if (res.ok) setMine(res.data);
-      });
-    }
   }, []);
+
+  // Таб солигдох бүрт тухайн тэмцээний жагсаалт болон өөрийн байрыг татна.
+  useEffect(() => {
+    let cancelled = false;
+    /* eslint-disable-next-line react-hooks/set-state-in-effect --
+       Таб солигдмогц ӨМНӨХ тэмцээний мөрүүдийг шууд арилгана. Хариу
+       ирэхийг хүлээвэл хэдэн зуун миллисекундын турш өөр тэмцээний
+       жагсаалт шинэ табын гарчигны дор харагдана — энэ нь буруу
+       мэдээлэл. */
+    setRows([]);
+    void apiGet<LeaderResponse>(`/api/leaderboard?limit=200&contest=${tab}`).then((res) => {
+      if (!cancelled && res.ok) setRows(res.data.rows);
+    });
+    const s = loadSession();
+    if (s) {
+      void apiPost<Standing>('/api/standing', { registrationId: s.id, contestId: tab })
+        .then((res) => { if (!cancelled && res.ok) setMine(res.data); });
+    }
+    return () => { cancelled = true; };
+  }, [tab]);
 
   async function lookup(e: React.FormEvent) {
     e.preventDefault();
@@ -133,14 +155,41 @@ export function ResultClient({ gameOpen }: { gameOpen: boolean }) {
       )}
 
       <section className="enter">
+        {/* Тэмцээний таб — тус бүр өөрийн жагсаалт, өөрийн ялагчтай. */}
+        <div className="mb-3 flex gap-2 overflow-x-auto">
+          {CONTESTS.map((c) => {
+            const st = contestState(c);
+            const on = c.id === tab;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setTab(c.id)}
+                aria-pressed={on}
+                className={`press min-h-10 shrink-0 rounded-full px-4 text-sm font-semibold ${
+                  on
+                    ? 'bg-[#E8B931] text-[#221E20]'
+                    : 'btn-night-ghost'
+                }`}
+              >
+                {c.name}
+                {st === 'open' && <span className="ml-1.5 text-[11px]">· одоо</span>}
+                {st === 'upcoming' && <span className="ml-1.5 text-[11px] opacity-70">· удахгүй</span>}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="flex items-baseline justify-between">
-          <h2 className="text-[22px] font-extrabold tracking-tight">Нийт жагсаалт</h2>
+          <h2 className="text-[22px] font-extrabold tracking-tight">Жагсаалт</h2>
           {rows.length > 0 && (
             <span className="text-sm text-[#C9D6E6]">{rows.length} оролцогч</span>
           )}
         </div>
         <p className="mb-3 mt-1 text-sm text-[#C9D6E6]">
-          ★ тэмдэгтэй эхний {GAME.PRIZE_PLACES} байр шагнал хүртэнэ.
+          {contestState(CONTESTS.find((c) => c.id === tab)!) === 'upcoming'
+            ? 'Энэ тэмцээн хараахан эхлээгүй байна.'
+            : `★ тэмдэгтэй 1-р байр энэ тэмцээний ялагч.`}
         </p>
         <LeaderTable rows={rows} highlightRank={found?.rank ?? mine?.rank ?? null} />
       </section>

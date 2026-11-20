@@ -1,33 +1,28 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { isGameOpen, gameClosesAt } from '@/lib/config';
+import { describe, it, expect } from 'vitest';
+import { isGameOpen } from '@/lib/config';
+import { CONTESTS, contestStartsAt, contestEndsAt } from '@/lib/contests';
 
-const ORIGINAL = process.env.GAME_CLOSES_AT;
-afterEach(() => { process.env.GAME_CLOSES_AT = ORIGINAL; });
-
+/**
+ * `isGameOpen` нь одоо ГУРВАН ТЭМЦЭЭНИЙ хуваариас хамаарна: нэг ч
+ * тэмцээн дуусаагүй л бол арга хэмжээ үргэлжилж байна.
+ */
 describe('isGameOpen', () => {
-  it('хаагдах огнооноос өмнө нээлттэй', () => {
-    process.env.GAME_CLOSES_AT = '2026-12-03T23:59:59+08:00';
-    expect(isGameOpen(new Date('2026-12-01T10:00:00+08:00'))).toBe(true);
+  const first = CONTESTS[0];
+  const last = [...CONTESTS].sort((a, b) => contestEndsAt(b).getTime() - contestEndsAt(a).getTime())[0];
+
+  it('эхний тэмцээн эхлэхээс өмнө ч нээлттэй (урьдчилж бүртгүүлнэ)', () => {
+    expect(isGameOpen(new Date(contestStartsAt(first).getTime() - 86_400_000))).toBe(true);
   });
 
-  it('хаагдах огнооны дараа хаалттай', () => {
-    process.env.GAME_CLOSES_AT = '2026-12-03T23:59:59+08:00';
-    expect(isGameOpen(new Date('2026-12-04T00:00:01+08:00'))).toBe(false);
+  it('тэмцээн хоорондын завсарт нээлттэй', () => {
+    expect(isGameOpen(new Date(contestEndsAt(first).getTime() + 60_000))).toBe(true);
   });
 
-  it('яг хаагдах мөчид нээлттэй хэвээр', () => {
-    process.env.GAME_CLOSES_AT = '2026-12-03T23:59:59+08:00';
-    expect(isGameOpen(new Date('2026-12-03T23:59:59+08:00'))).toBe(true);
+  it('сүүлийн тэмцээн дуусах яг мөчид нээлттэй', () => {
+    expect(isGameOpen(contestEndsAt(last))).toBe(true);
   });
 
-  it('GAME_CLOSES_AT тохируулаагүй бол анхдагч огноог ашиглана (сайт унахгүй)', () => {
-    delete process.env.GAME_CLOSES_AT;
-    expect(() => gameClosesAt()).not.toThrow();
-    expect(gameClosesAt().toISOString()).toBe(new Date('2026-12-03T23:59:59+08:00').toISOString());
-  });
-
-  it('GAME_CLOSES_AT буруу бол алдаа шиднэ', () => {
-    process.env.GAME_CLOSES_AT = 'тийм огноо байхгүй';
-    expect(() => gameClosesAt()).toThrow();
+  it('бүх тэмцээн дууссаны дараа хаалттай', () => {
+    expect(isGameOpen(new Date(contestEndsAt(last).getTime() + 1000))).toBe(false);
   });
 });

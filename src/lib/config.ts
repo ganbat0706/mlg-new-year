@@ -1,3 +1,5 @@
+import { allContestsClosed } from './contests';
+
 /** 1. Зөв зам — контейнер зөв чиглэлд ангилах тоглоом. Дээд оноо: 12 × 80 = 960. */
 export const SORT = {
   DURATION_MS: 15_000,
@@ -73,38 +75,28 @@ export const DROP = {
 export const MAX_TOTAL_SCORE = 4 * 960;
 
 export const GAME = {
-  MAX_ATTEMPTS: 3,
-  PRIZE_PLACES: 5,
+  /** НЭГ ТЭМЦЭЭНД ногдох оролдлого. Гурван тэмцээн тул нийт 3 удаа тоглоно. */
+  MAX_ATTEMPTS: 1,
+  /** Тэмцээн бүрт ганц ялагч. */
+  PRIZE_PLACES: 1,
   /** Үүнээс удсан in_progress оролдлого хүчингүй болно. */
   ATTEMPT_TIMEOUT_MS: 30 * 60 * 1000,
   INVITE_PREFIX: 'MLG-2026',
 } as const;
 
 /**
- * Тоглоом хаагдах хугацааны АНХДАГЧ утга. `.env.example`-тэй ижил.
+ * Тоглоом «нээлттэй» эсэх нь одоо ГУРВАН ТЭМЦЭЭНИЙ хуваариас хамаарна
+ * (src/lib/contests.ts). Нэг ч тэмцээн дуусаагүй л бол арга хэмжээ
+ * үргэлжилж байна гэсэн үг — тэмцээн хоорондын завсарт ч бүртгэл
+ * нээлттэй байх ёстой (хүн урьдчилж бүртгүүлнэ).
  *
- * Өмнө нь `GAME_CLOSES_AT` тохируулаагүй бол энэ функц алдаа шиддэг байв.
- * Үүний үр дүнг production дээр бодитоор үзлээ: хувьсагч нэмэхээс өмнө
- * нүүр хуудас, дүрэм, үр дүн — БҮХ хуудас 500 буцааж, ажилтанд ямар ч
- * мэдээлэл үлдэхгүй цагаан дэлгэц харагдав. Тоглоомын хаалтын огноо нь
- * кодод аль хэдийн бичигдсэн, тогтсон мэдээлэл тул түүнийг нууц
- * тохиргоо мэт шаардах шалтгаан байхгүй.
+ * Тоглох боломжтой эсэх нь ӨӨР асуулт: түүнийг `activeContest()`
+ * шийднэ. `/play` болон оролдлого эхлүүлэх API тэрийг шалгана.
  *
- * Буруу бичигдсэн утга бол ӨӨР асуудал — тэр нь бодит алдаа тул хэвээр
- * шиднэ (чимээгүйгээр анхдагч руу буцвал арга хэмжээний баг буруу огноо
- * тохируулсанаа мэдэхгүй өнгөрнө).
+ * Өмнөх `GAME_CLOSES_AT` орчны хувьсагч хэрэггүй болов.
  */
-const DEFAULT_CLOSES_AT = '2026-12-03T23:59:59+08:00';
-
-export function gameClosesAt(): Date {
-  const raw = process.env.GAME_CLOSES_AT ?? DEFAULT_CLOSES_AT;
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) throw new Error(`GAME_CLOSES_AT буруу: ${raw}`);
-  return d;
-}
-
 export function isGameOpen(now: Date = new Date()): boolean {
-  return now.getTime() <= gameClosesAt().getTime();
+  return !allContestsClosed(now);
 }
 
 export function eventInfo() {

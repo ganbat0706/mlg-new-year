@@ -6,7 +6,6 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ImageResponse } from 'next/og';
 import { findByInviteCode } from '@/lib/repo/registrations';
-import { getStanding } from '@/lib/repo/leaderboard';
 import { eventInfo } from '@/lib/config';
 
 export const runtime = 'nodejs';
@@ -233,7 +232,6 @@ export async function GET(
   const reg = await findByInviteCode(code);
   if (!reg) return new Response('Урилга олдсонгүй', { status: 404 });
 
-  const standing = await getStanding(reg.id);
   const event = eventInfo();
   const origin = new URL(req.url).origin;
   const [fonts, logo] = await Promise.all([loadFonts(), loadLogo(origin)]);
@@ -244,7 +242,13 @@ export async function GET(
   const venueLineHeight = 1.28;
   const venueShown = fitVenue(venueText, venueSize);
 
-  const scoreLine = `ОНОО ${reg.bestScore.toLocaleString('mn-MN')}${standing ? ` · ${standing.rank}-Р БАЙР` : ''}`;
+  /*
+    Байрыг урилган дээр ХЭВЛЭХГҮЙ. Гурван тусдаа тэмцээн болсон тул
+    «нэг байр» гэж байхгүй — аль нэгийг нь сонгож хэвлэвэл хүний гарт
+    байгаа цаасан дээр төөрөгдүүлсэн тоо үлдэнэ. Урилга бол тасалбар,
+    самбар биш. Нийт хамгийн сайн оноог л харуулна.
+  */
+  const scoreLine = `ОНОО ${reg.bestScore.toLocaleString('mn-MN')}`;
 
   return new ImageResponse(
     (

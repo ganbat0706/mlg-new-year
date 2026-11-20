@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { registerOrGet, findByPhone, findByInviteCode } from '@/lib/repo/registrations';
 import { resetDb } from './helpers/db';
+import { GAME } from '@/lib/config';
 
 const input = {
   lastName: 'батхүү',
@@ -17,7 +18,7 @@ describe('registerOrGet', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.value.inviteCode).toBe('MLG-202601');
-    expect(r.value.attemptsLeft).toBe(3);
+    expect(r.value.attemptsLeft).toBe(GAME.MAX_ATTEMPTS);
   });
 
   it('нэрийг хэвийн болгож хадгална', async () => {

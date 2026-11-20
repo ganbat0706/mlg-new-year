@@ -22,9 +22,29 @@ export async function ensureOneOpenAttemptIndex(): Promise<void> {
     WHERE status = 'in_progress';
   `;
 }
+/**
+ * НЭГ ТЭМЦЭЭНД НЭГ ОРОЛДЛОГО — санд түвшинд. Аппликейшны логик (FOR UPDATE
+ * түгжээтэй тоолол) үүнийг аль хэдийн хангадаг ч тэмцээн бүрт ганц ялагч
+ * шалгаруулж, шагнал олгох тул давхар баталгаа зүйтэй.
+ *
+ * `invalid` (30 минутаас удаж хүчингүй болсон) оролдлого тоологдохгүй —
+ * сүлжээ тасарсан хүн дахин тоглох ёстой.
+ *
+ * ЖИЧ: энэ индекс нь GAME.MAX_ATTEMPTS = 1 гэдгийг кодчилсон. Хэрэв нэг
+ * тэмцээнд олон оролдлого зөвшөөрөх бол ЭНЭ ИНДЕКСИЙГ УСТГАНА.
+ */
+export async function ensureOneAttemptPerContest(): Promise<void> {
+  await client`
+    CREATE UNIQUE INDEX IF NOT EXISTS attempts_one_per_registration_contest
+    ON attempts (registration_id, contest_id)
+    WHERE status <> 'invalid';
+  `;
+}
+
 async function main() {
   await ensureInviteSequence();
   await ensureOneOpenAttemptIndex();
+  await ensureOneAttemptPerContest();
 }
 
 if (require.main === module) {

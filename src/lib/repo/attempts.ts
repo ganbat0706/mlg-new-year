@@ -1,5 +1,5 @@
 import {
-  and, eq, lt, sql,
+  and, eq, lt, ne, sql,
 } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { attempts, registrations } from '@/lib/db/schema';
@@ -20,6 +20,7 @@ import {
 } from '@/lib/games/drop';
 import { totalScore } from '@/lib/scoring';
 import type { Result } from '@/lib/validation';
+import { activeContest, type Contest } from '@/lib/contests';
 
 const fail = (error: string): Result<never> => ({ ok: false, error });
 
@@ -46,7 +47,13 @@ async function expireStaleAttempts(tx: Tx, registrationId: string): Promise<void
   }
 }
 
-export async function startAttempt(registrationId: string): Promise<Result<{
+export async function startAttempt(
+  registrationId: string,
+  /** Цагийг гаднаас өгөх боломжтой — тестэд тодорхой тэмцээний цонх дотор
+   *  байрлуулахад, мөн «яг энэ мөчид аль тэмцээн нээлттэй вэ» гэдгийг
+   *  нэг л газраас шийдэхэд хэрэгтэй. */
+  now: Date = new Date(),
+): Promise<Result<{
   attemptId: string;
   sortSchedule: SortItem[];
   stackSchedule: StackLevel[];
@@ -66,6 +73,12 @@ export async function startAttempt(registrationId: string): Promise<Result<{
   // (registrations before attempts, always.) finishAttempt ч яг энэ дарааллыг
   // баримталдаг тул хоёр transaction эсрэг чиглэлд түгжиж, Postgres deadlock
   // үүсгэх боломжгүй.
+  // Тоглох боломжтой эсэх нь ЦАГААС хамаарна: яг одоо нээлттэй тэмцээн
+  // байхгүй бол оролдлого огт үүсэхгүй. Үүнийг транзакцаас ГАДНА шалгана —
+  // санд хандах шаардлагагүй.
+  const contest: Contest | null = activeContest(now);
+  if (!contest) return fail('Яг одоо нээлттэй тэмцээн алга байна');
+
   return db.transaction(async (tx) => {
     const [reg] = await tx.select().from(registrations)
       .where(eq(registrations.id, registrationId)).for('update').limit(1);
@@ -73,13 +86,13 @@ export async function startAttempt(registrationId: string): Promise<Result<{
 
     await expireStaleAttempts(tx, registrationId);
 
-    // expireStaleAttempts нь attemptsUsed-ийг өөрчилсөн байж болох тул дахин уншина.
-    const [freshReg] = await tx.select().from(registrations)
-      .where(eq(registrations.id, registrationId)).limit(1);
-
     // Дуусаагүй оролдлого байвал үргэлжлүүлнэ.
     const [open] = await tx.select().from(attempts)
-      .where(and(eq(attempts.registrationId, registrationId), eq(attempts.status, 'in_progress')))
+      .where(and(
+        eq(attempts.registrationId, registrationId),
+        eq(attempts.contestId, contest.id),
+        eq(attempts.status, 'in_progress'),
+      ))
       .limit(1);
 
     if (open) {
@@ -99,14 +112,34 @@ export async function startAttempt(registrationId: string): Promise<Result<{
       };
     }
 
-    if (freshReg.attemptsUsed >= GAME.MAX_ATTEMPTS) {
-      return fail(`Та ${GAME.MAX_ATTEMPTS} оролдлогоо бүрэн ашигласан байна`);
+    /*
+      Хязгаарыг бүртгэлийн НИЙТ тоогоор биш, ЭНЭ ТЭМЦЭЭН дэх оролдлогоор
+      тооцно. Гурван тусдаа тэмцээн тул нэг тэмцээн дэх оролдлого нөгөөд
+      нөлөөлөх ёсгүй. `attemptsUsed` багана нь админд харуулах нийт тоо
+      болж үлдэнэ.
+    */
+    /*
+      ХҮЧИНГҮЙ болсон оролдлого тоологдохгүй. `expireStaleAttempts` нь 30
+      минутаас удсан дуусаагүй оролдлогыг `invalid` болгодог — сүлжээ
+      тасарч дундаас нь гарсан хүн дахин тоглох ёстой. Үүнийг тооцохгүй
+      бол тэр хүн тэмцээнээс бүрмөсөн хасагдана.
+    */
+    const used = await tx.select({ id: attempts.id }).from(attempts)
+      .where(and(
+        eq(attempts.registrationId, registrationId),
+        eq(attempts.contestId, contest.id),
+        ne(attempts.status, 'invalid'),
+      ));
+    if (used.length >= GAME.MAX_ATTEMPTS) {
+      return fail(GAME.MAX_ATTEMPTS === 1
+        ? 'Та энэ тэмцээнд аль хэдийн оролцсон байна'
+        : `Та энэ тэмцээний ${GAME.MAX_ATTEMPTS} оролдлогоо бүрэн ашигласан байна`);
     }
 
     const seed = Math.floor(Math.random() * 2_147_483_647);
 
     const [created] = await tx.insert(attempts)
-      .values({ registrationId, seed })
+      .values({ registrationId, seed, contestId: contest.id })
       .returning();
     await tx.update(registrations)
       .set({ attemptsUsed: sql`${registrations.attemptsUsed} + 1` })

@@ -4,6 +4,10 @@ import {
 } from '@/lib/repo/attempts';
 import { registerOrGet } from '@/lib/repo/registrations';
 import { resetDb } from './helpers/db';
+import { CONTESTS, contestStartsAt } from '@/lib/contests';
+
+/** Оролдлого эхлүүлэхэд нээлттэй тэмцээн хэрэгтэй — эхний тэмцээний цонх. */
+const DURING = new Date(contestStartsAt(CONTESTS[0]).getTime() + 60_000);
 import { SORT, STACK, MEMO, PLAY } from '@/lib/config';
 import { db } from '@/lib/db';
 import { attempts } from '@/lib/db/schema';
@@ -25,7 +29,7 @@ async function newRegistration(phone = '88112233') {
 /** Шинэ attempt үүсгэж, гурван тоглоомын хуваарийн хамт буцаана. */
 async function freshAttempt() {
   const reg = await newRegistration();
-  const r = await startAttempt(reg.id);
+  const r = await startAttempt(reg.id, DURING);
   if (!r.ok) throw new Error(r.error);
   return r.value;
 }

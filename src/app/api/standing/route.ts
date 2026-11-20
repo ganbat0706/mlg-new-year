@@ -1,4 +1,5 @@
 import { getStanding } from '@/lib/repo/leaderboard';
+import { contestById, focusContest } from '@/lib/contests';
 import { findByPhone, findById } from '@/lib/repo/registrations';
 import { validatePhone } from '@/lib/validation';
 import { ok, bad, boom, readJson } from '@/lib/http';
@@ -12,7 +13,8 @@ export async function POST(req: Request): Promise<Response> {
     return bad('Хэт олон удаа оролдлоо. Минут хүлээгээд дахин оролдоно уу.', 429);
   }
 
-  const body = await readJson<{ phone?: string; registrationId?: string }>(req);
+  const body = await readJson<{ phone?: string; registrationId?: string; contestId?: string }>(req);
+  const contest = contestById(body?.contestId ?? '') ?? focusContest();
 
   /**
    * Хоёр оролт: утасны дугаар (бусдыг хайх) эсвэл бүртгэлийн id (өөрийн
@@ -35,12 +37,14 @@ export async function POST(req: Request): Promise<Response> {
       if (!reg) return bad('Энэ дугаараар бүртгэл олдсонгүй', 404);
     }
 
-    const standing = await getStanding(reg.id);
+    const standing = await getStanding(contest.id, reg.id);
     return ok({
       lastName: reg.lastName,
       firstName: reg.firstName,
       inviteCode: reg.inviteCode,
       bestScore: reg.bestScore,
+      contestId: contest.id,
+      contestName: contest.name,
       rank: standing?.rank ?? null,
       total: standing?.total ?? 0,
     });

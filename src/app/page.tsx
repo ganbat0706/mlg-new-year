@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { isGameOpen, eventInfo } from '@/lib/config';
+import { CONTESTS, contestState, contestStartsAt, contestEndsAt } from '@/lib/contests';
 import { Brand } from '@/components/Brand';
 import { WinterScene } from '@/components/WinterScene';
 
@@ -35,10 +36,40 @@ export default function Home() {
           эхний 5 ажилтан арга хэмжээн дээр шагнал хүртэнэ.
         </p>
 
-        <ul className="enter enter-delay-3 mt-8 space-y-2 text-base text-[#C9D6E6]">
-          <li>· Зөв зам · Контейнер овоолох · Хос манифест · Агаараас буулгах — 4 богино тоглоом</li>
-          <li>· 3 удаа оролдож болно, хамгийн сайн оноо тооцогдоно</li>
-        </ul>
+        {/*
+          Гурван тусдаа тэмцээн — тус бүр өөрийн цонхтой, өөрийн ялагчтай.
+          Хүн хэзээ юу болохыг нүүр хуудаснаас шууд харах ёстой.
+        */}
+        <ol className="enter enter-delay-3 mt-8 space-y-2.5">
+          {CONTESTS.map((c, i) => {
+            const st = contestState(c);
+            const d = (iso: Date) => iso.toLocaleString('mn-MN', {
+              month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+            });
+            return (
+              <li key={c.id} className="flex items-baseline gap-3 text-base">
+                <span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full
+                                  text-xs font-bold ${
+                  st === 'open' ? 'bg-[#E8B931] text-[#221E20]'
+                    : st === 'closed' ? 'bg-[#2A3350] text-[#C9D6E6]'
+                      : 'border border-[#C9D6E6]/45 text-[#C9D6E6]'
+                }`}>{i + 1}</span>
+                <span className="min-w-0">
+                  <span className="font-semibold text-[#FAF7F0]">{c.name}</span>
+                  {st === 'open' && <span className="ml-2 text-sm font-semibold text-[#E8B931]">одоо нээлттэй</span>}
+                  {st === 'closed' && <span className="ml-2 text-sm text-[#C9D6E6]">дууссан</span>}
+                  <span className="block text-sm text-[#C9D6E6]">
+                    {d(contestStartsAt(c))} – {d(contestEndsAt(c))}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+        <p className="enter enter-delay-3 mt-4 text-sm text-[#C9D6E6]">
+          Тэмцээн бүрт <strong className="text-[#FAF7F0]">нэг л удаа</strong> тоглоно.
+          Тус бүрийн <strong className="text-[#FAF7F0]">1-р байр</strong> шагнал хүртэнэ.
+        </p>
 
         <Link
           href="/register"
