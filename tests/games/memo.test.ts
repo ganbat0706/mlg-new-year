@@ -53,8 +53,7 @@ describe('scoreMemo', () => {
   });
 
   it(
-    'гар тооцоо: 2 хос, алдаагүй, 600мс-д дуусав → ' +
-      '2×130=260 + min(180, floor((20000-600)/1000)×30)=min(180,570)=180 → 440',
+    'гар тооцоо: 2 хос, алдаагүй, 600мс-д дуусав — оноог тохиргооноос гаргана',
     () => {
       // schedule: slot0=pair0, slot1=pair1, slot2=pair0, slot3=pair1
       const schedule = [0, 1, 0, 1];
@@ -65,7 +64,13 @@ describe('scoreMemo', () => {
         { card: 3, t: 600 }, // хос1 тохирно → дуусав
       ];
       const r = scoreMemo(schedule, events);
-      expect(r.score).toBe(440);
+      // Тоог ГАРААР бичихгүй: PAIR_POINTS / BONUS_* өөрчлөгдөхөд тест худал
+      // унадаг байв. Томьёог нь шалгах нь зорилго, тогтмолыг нь биш.
+      const bonus = Math.min(
+        MEMO.BONUS_MAX,
+        Math.floor((MEMO.DURATION_MS - 600) / 1000) * MEMO.BONUS_PER_SEC,
+      );
+      expect(r.score).toBe(2 * MEMO.PAIR_POINTS + bonus);
       expect(r.accepted).toBe(4);
       expect(r.rejected).toBe(0);
       expect(r.perfect).toBe(true);
@@ -92,7 +97,7 @@ describe('scoreMemo', () => {
       const schedule = [0, 1, 1, 0, 2, 2];
       const baseline: MemoEvent[] = [
         { card: 0, t: 0 },
-        { card: 1, t: 200 }, // буруу хос → lockUntil=800
+        { card: 1, t: 200 }, // буруу хос → lockUntil = 200 + MEMO.LOCK_MS
         { card: 0, t: 900 }, // дахин нээнэ
         { card: 3, t: 1100 }, // хос0 тохирно (+130)
         { card: 1, t: 1300 },
@@ -119,7 +124,11 @@ describe('scoreMemo', () => {
       const rIgnored = scoreMemo(schedule, withIgnored);
 
       expect(rIgnored).toEqual(rBase);
-      expect(rBase.score).toBe(570); // 3×130 + min(180, floor(18.1)×30)=180
+      const bonus = Math.min(
+        MEMO.BONUS_MAX,
+        Math.floor((MEMO.DURATION_MS - 1900) / 1000) * MEMO.BONUS_PER_SEC,
+      );
+      expect(rBase.score).toBe(3 * MEMO.PAIR_POINTS + bonus);
       expect(rBase.accepted).toBe(8);
       expect(rBase.rejected).toBe(0);
       expect(rBase.perfect).toBe(false);

@@ -71,7 +71,7 @@ describe('scoreSort', () => {
     expect(r.rejected).toBe(0);
   });
 
-  it('гар тооцоо: rail/road/damaged 3 зүйлээс 2 зөв, 1 буруу → 80+80-40=120', () => {
+  it('гар тооцоо: 3 зүйлээс 2 зөв, 1 буруу (оноог тохиргооноос гаргана)', () => {
     const schedule: SortItem[] = [
       { id: 0, mode: 'rail', damaged: false },
       { id: 1, mode: 'road', damaged: false },
@@ -79,14 +79,15 @@ describe('scoreSort', () => {
     ];
     // 0: 'rail' зөв (+80), 1: 'road' зөв (+80), 2: 'road' гэж дарсан боловч
     // хүлээгдэж буй нь 'return' (эвдэрсэн) тул буруу (-40).
-    // Нийлбэр: 80 + 80 - 40 = 120.
+    // Нийлбэр: 2×CORRECT_POINTS + WRONG_POINTS. Тоог энд ГАРААР бичихгүй —
+    // тохиргоо өөрчлөгдөхөд тест худал унадаг байв.
     const events: SortEvent[] = [
       { id: 0, lane: 'rail', t: 300 },
       { id: 1, lane: 'road', t: 600 },
       { id: 2, lane: 'road', t: 900 },
     ];
     const r = scoreSort(schedule, events);
-    expect(r.score).toBe(120);
+    expect(r.score).toBe(2 * SORT.CORRECT_POINTS + SORT.WRONG_POINTS);
     expect(r.accepted).toBe(3);
   });
 

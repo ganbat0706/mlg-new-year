@@ -259,7 +259,14 @@ export function SortStage({ attemptId, schedule, onDone }: Props) {
         {current && (
           <div key={current.id} className="obj-mount flex flex-col items-center gap-3">
             {current.damaged ? <DamagedIcon /> : <ModeIcon mode={current.mode} />}
-            <p data-testid="sort-label" className="text-xl font-bold text-[#FAF7F0]">
+            {/*
+              Нэрийг НУУВ — зөвхөн дүрсээр таних. Өмнө нь «Төмөр зам» гэж
+              бичээд доор нь «Төмөр зам» товч байсан тул тоглоом бараг
+              уншиж товших дасгал болсон байв. Дүрс нь ачааны төрлийг
+              хэлэх ёстой; нэр нь дэлгэц уншигчид (screen reader)
+              хэвээр хүрнэ.
+            */}
+            <p data-testid="sort-label" className="sr-only">
               {current.damaged ? 'Эвдэрсэн' : MODE_LABEL[current.mode]}
             </p>
           </div>

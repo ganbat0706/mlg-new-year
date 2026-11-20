@@ -3,7 +3,7 @@ import { startAttempt, finishAttempt } from '@/lib/repo/attempts';
 import { CONTESTS, contestStartsAt } from '@/lib/contests';
 import { registerOrGet } from '@/lib/repo/registrations';
 import { resetDb } from './helpers/db';
-import { GAME } from '@/lib/config';
+import { GAME, SORT, STACK, MEMO, DROP } from '@/lib/config';
 import { db } from '@/lib/db';
 import { attempts, registrations } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -31,14 +31,18 @@ beforeEach(async () => {
 });
 
 describe('startAttempt', () => {
-  it('оролдлого үүсгэж гурван тоглоомын хуваарь буцаана', async () => {
+  it('оролдлого үүсгэж дөрвөн тоглоомын хуваарь буцаана', async () => {
     const reg = await newRegistration();
     const r = await startAttempt(reg.id, DURING);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value.sortSchedule.length).toBe(12);
-    expect(r.value.stackSchedule.length).toBe(6);
-    expect(r.value.memoSchedule.length).toBe(12);
+    // Уртыг тохиргооноос гаргана — тоглоомын хүндрэл тохируулахад тест
+    // худал унадаг байв.
+    expect(r.value.sortSchedule.length).toBe(SORT.ITEM_COUNT);
+    expect(r.value.stackSchedule.length).toBe(STACK.LEVELS);
+    expect(r.value.memoSchedule.length).toBe(MEMO.PAIRS * 2);
+    expect(r.value.dropSchedule.passes.length).toBe(DROP.DROPS);
+    expect(r.value.dropSchedule.wall.reduce((a, b) => a + b, 0)).toBe(DROP.DROPS);
     expect(r.value.sortDone).toBe(false);
     expect(r.value.stackDone).toBe(false);
     expect(r.value.memoDone).toBe(false);

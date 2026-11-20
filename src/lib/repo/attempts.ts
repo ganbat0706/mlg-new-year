@@ -184,6 +184,27 @@ export async function listFlaggedReasons(): Promise<Map<string, string[]>> {
   return byReg;
 }
 
+/**
+ * Тухайн тоглолт «боломжгүй хурдан» байсан эсэх.
+ *
+ * Доод хязгаар нь ХОЁРЫН БАГА нь:
+ *   • `0.8 × DURATION` — бүтэн хугацаагаа ажилладаг тоглоомд,
+ *   • `үйлдлийн тоо × 350мс` — бүх зүйлээ дуусгамагц ТӨГСДӨГ тоглоомд.
+ *
+ * Хоёр дахь нөхцөл байхгүй үед хурдан ШУДАРГА тоглогч шийтгэгдэж байв:
+ * 12 ачааг 9 секундэд ангилсан хүн `0.8 × 12с = 9.6с`-д унаж, 0 оноо
+ * аваад «сэжигтэй» гэж тэмдэглэгдэнэ. Тоглоомууд хүндэрч, хугацаа
+ * богиноссоноор энэ нь ховор биш, ердийн зүйл болох байсан.
+ *
+ * Аюулгүй байдал суларсангүй: 0мс зайтай script нь MIN_EVENT_GAP_MS
+ * (200мс) шалгуурт аль хэдийн баригддаг.
+ */
+function tooFastToBeHuman(elapsedMs: number, durationMs: number, eventCount: number): boolean {
+  const byDuration = durationMs * PLAY.MIN_ELAPSED_RATIO;
+  const byEvents = eventCount * PLAY.MIN_MS_PER_EVENT;
+  return elapsedMs < Math.min(byDuration, byEvents);
+}
+
 /** Гурван тоглоом. */
 export type GameName = 'sort' | 'stack' | 'memo' | 'drop';
 
@@ -262,7 +283,7 @@ export async function submitSort(
     let flagReason = attempt.flagReason;
     let score: number;
 
-    if (elapsedMs < SORT.DURATION_MS * PLAY.MIN_ELAPSED_RATIO) {
+    if (tooFastToBeHuman(elapsedMs, SORT.DURATION_MS, events.length)) {
       // Бодитоор хангалттай хугацаа өнгөрөөгүй — хүн энэ хурдаар тоглох
       // боломжгүй. Бүхэл оролдлогыг татгалзахгүй, зөвхөн энэ тоглоомыг 0
       // болгож, тэмдэглэнэ (шагнахаас өмнө админ шалгана).
@@ -310,7 +331,7 @@ export async function submitStack(
     let flagReason = attempt.flagReason;
     let score: number;
 
-    if (elapsedMs < STACK.DURATION_MS * PLAY.MIN_ELAPSED_RATIO) {
+    if (tooFastToBeHuman(elapsedMs, STACK.DURATION_MS, events.length)) {
       score = 0;
       flagged = true;
       flagReason = appendReason(flagReason, 'stack: бодит хугацаа хэт богино (боломжгүй хурд)');
@@ -355,7 +376,7 @@ export async function submitMemo(
     let flagReason = attempt.flagReason;
     let score: number;
 
-    if (elapsedMs < MEMO.DURATION_MS * PLAY.MIN_ELAPSED_RATIO) {
+    if (tooFastToBeHuman(elapsedMs, MEMO.DURATION_MS, events.length)) {
       score = 0;
       flagged = true;
       flagReason = appendReason(flagReason, 'memo: бодит хугацаа хэт богино (боломжгүй хурд)');
@@ -406,7 +427,7 @@ export async function submitDrop(
     let flagReason = attempt.flagReason;
     let score: number;
 
-    if (elapsedMs < DROP.DURATION_MS * PLAY.MIN_ELAPSED_RATIO) {
+    if (tooFastToBeHuman(elapsedMs, DROP.DURATION_MS, events.length)) {
       score = 0;
       flagged = true;
       flagReason = appendReason(flagReason, 'drop: бодит хугацаа хэт богино (боломжгүй хурд)');

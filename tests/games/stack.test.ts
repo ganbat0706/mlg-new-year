@@ -108,14 +108,17 @@ describe('scoreStack', () => {
     expect(r.rejected).toBe(0);
   });
 
-  it('гар тооцоо: offset=6 (12-ын тэн хагас) → 100 + round(60×(1-6/12)) = 100+30 = 130', () => {
-    // period=1000, startPhase=0, direction=1 → t=250мс дээр pos = 10+80*(250/500) = 50.
-    // centre=50 тул offset=0 бол яг 160 гарна; offset=6 гаргахын тулд pos=56 болгоно:
-    // 56 = 10+80*(m/500) → m = 500*46/80 = 287.5мс.
+  it('гар тооцоо: тэнцвэрийн ТЭН ХАГАС хазайлт → суурь + нарийвчлалын хагас', () => {
+    // period=1000, startPhase=0, direction=1 → pos = 10 + 80*(m/500).
+    // Тэнцвэрийн тэн хагас хазайлт гаргахын тулд pos = 50 + TOLERANCE/2.
+    const half = STACK.TOLERANCE_PCT / 2;
     const level: StackLevel = { level: 1, periodMs: 1000, startPhase: 0, direction: 1 };
-    const r = scoreStack([level], [{ level: 1, t: 287.5 }]);
-    // 100 + round(60 × (1 - 6/12)) = 100 + round(30) = 130
-    expect(r.score).toBe(130);
+    const m = (500 * (50 + half - 10)) / 80;
+    const r = scoreStack([level], [{ level: 1, t: m }]);
+    // Тоог ГАРААР бичихгүй — TOLERANCE_PCT өөрчлөгдөхөд тест худал унадаг байв.
+    expect(r.score).toBe(
+      STACK.BASE_POINTS + Math.round(STACK.PRECISION_POINTS * (1 - half / STACK.TOLERANCE_PCT)),
+    );
   });
 
   it('тэнцвэрээс (TOLERANCE_PCT) гадуур унавал 0 оноо, centre өөрчлөгдөхгүй', () => {
